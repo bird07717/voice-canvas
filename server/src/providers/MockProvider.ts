@@ -17,6 +17,22 @@ export class MockProvider implements ModelProvider {
       return mockResponses.deleteMissingObject;
     }
 
+    const clarifiedTarget = resolveClarifiedTarget(input, normalized);
+    if (clarifiedTarget) {
+      return {
+        understanding: `根据澄清回答选中了${clarifiedTarget.label}`,
+        operations: [
+          {
+            op: "setStyle",
+            targetIds: [clarifiedTarget.id],
+            style: { fill: "红", stroke: "黑", strokeWidth: 2 },
+          },
+        ],
+        reply: `已经把${clarifiedTarget.label}变成红色了`,
+        clarify: null,
+      };
+    }
+
     if (
       matchesAny(normalized, ["那个东西", "这个东西", "那东西", "它"]) &&
       matchesAny(normalized, ["弄红", "变红", "改红", "红色"]) &&
@@ -100,5 +116,65 @@ function createAmbiguousClarify(input: ParseInput): ParseResult {
       question: `画布上有多个对象，你是指${options.join("，还是")}？`,
       options,
     },
+  };
+}
+
+function resolveClarifiedTarget(input: ParseInput, normalized: string) {
+  if (!hasRecentClarify(input)) {
+    return null;
+  }
+
+  const objects = Array.isArray(input.scene?.objects) ? input.scene.objects : [];
+
+  for (const object of objects) {
+    const candidate = readSceneObjectCandidate(object);
+    if (!candidate) {
+      continue;
+    }
+
+    const aliases = [
+      candidate.label,
+      candidate.type === "circle" ? "圆" : "",
+      candidate.type === "rect" ? "方块" : "",
+      candidate.type === "triangle" ? "三角形" : "",
+      candidate.type === "line" ? "线" : "",
+    ].filter(Boolean);
+
+    if (aliases.some((alias) => normalized.includes(alias))) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function hasRecentClarify(input: ParseInput) {
+  return Boolean(
+    input.recentTurns?.some(
+      (turn) =>
+        turn.role === "assistant" &&
+        (turn.content.includes("你是指") || turn.content.includes("多个对象")),
+    ),
+  );
+}
+
+function readSceneObjectCandidate(object: unknown) {
+  if (!object || typeof object !== "object") {
+    return null;
+  }
+
+  const candidate = object as { id?: unknown; label?: unknown; type?: unknown };
+
+  if (typeof candidate.id !== "string") {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    label:
+      typeof candidate.label === "string" && candidate.label.trim()
+        ? candidate.label
+        : candidate.id,
+    type: typeof candidate.type === "string" ? candidate.type : "",
   };
 }

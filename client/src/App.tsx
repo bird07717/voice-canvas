@@ -3,8 +3,9 @@ import "./App.css";
 import { DebugPanel } from "./components/DebugPanel";
 import { SceneRenderer } from "./components/SceneRenderer";
 import { VoicePanel } from "./components/VoicePanel";
+import { formatExecReport } from "./scene/report";
 import { useSceneStore } from "./scene/store";
-import type { ExecReport, Operation } from "./scene/types";
+import type { Operation } from "./scene/types";
 import { useVoiceLoop } from "./voice/useVoiceLoop";
 
 type HealthState =
@@ -21,7 +22,7 @@ function App() {
   const apply = useSceneStore((state) => state.apply);
   const confirmPendingAction = useSceneStore((state) => state.confirmPendingAction);
   const cancelPendingAction = useSceneStore((state) => state.cancelPendingAction);
-  const reportText = useMemo(() => formatReport(lastReport), [lastReport]);
+  const reportText = useMemo(() => formatExecReport(lastReport), [lastReport]);
   const voiceLoop = useVoiceLoop({
     getScene: () => useSceneStore.getState().scene,
     apply,
@@ -147,14 +148,6 @@ function App() {
       </aside>
     </main>
   );
-}
-
-function formatReport(report: ExecReport | null) {
-  if (!report) {
-    return "No operations executed yet.";
-  }
-
-  return `${report.okCount} ok, ${report.failCount} skipped or failed`;
 }
 
 function getHealthLabel(health: HealthState) {

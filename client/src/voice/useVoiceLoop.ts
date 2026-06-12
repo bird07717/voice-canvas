@@ -10,6 +10,7 @@ import {
   type SpeechRecognitionLike,
 } from "./asr";
 import type { ResponseEnvelope } from "./responseEnvelope";
+import { formatIssueReason } from "../scene/report";
 import type { SceneState } from "../scene/types";
 import type { useSceneStore } from "../scene/store";
 
@@ -199,13 +200,10 @@ export function useVoiceLoop({
         }
 
         if (report.failCount > 0) {
-          const reason = report.results
-            .filter((result) => result.status !== "ok")
-            .map((result) => result.reason)
-            .join("；");
+          const reason = envelope.reply ?? formatIssueReason(report);
           pushThought("Fallback", reason || "Some operations were skipped.");
-          speak(reason || envelope.reply);
-          if (!reason && !envelope.reply) {
+          speak(reason);
+          if (!reason) {
             setMode("active");
           }
           return;
