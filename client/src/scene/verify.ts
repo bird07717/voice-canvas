@@ -1,6 +1,7 @@
 import { operationSchema } from "./schema";
 import { applyOperations, createInitialSceneState } from "./executor";
 import { useSceneStore } from "./store";
+import { responseEnvelopeSchema } from "../voice/responseEnvelope";
 import type { Operation } from "./types";
 
 const validCreate: Operation = {
@@ -22,6 +23,25 @@ const invalidResult = operationSchema.safeParse({
 });
 if (invalidResult.success) {
   throw new Error("Expected extra operation fields to be rejected");
+}
+
+const envelopeResult = responseEnvelopeSchema.safeParse({
+  understanding: "创建红色圆",
+  operations: [validCreate],
+  reply: "画好了",
+  clarify: null,
+});
+if (!envelopeResult.success) {
+  throw new Error("Expected response envelope to pass validation");
+}
+
+const invalidEnvelope = responseEnvelopeSchema.safeParse({
+  understanding: "缺少字段",
+  operations: [],
+  reply: null,
+});
+if (invalidEnvelope.success) {
+  throw new Error("Expected response envelope without clarify to fail");
 }
 
 let scene = createInitialSceneState();
