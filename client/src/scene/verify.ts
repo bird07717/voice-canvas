@@ -152,4 +152,14 @@ if ((groupScene.objects[0]?.geometry.x ?? 0) >= 600) {
   throw new Error("Expected group move to move member left");
 }
 
+const contextScene = applyOperations(rowScene, [
+  {
+    op: "delete",
+    targetIds: ["__largest__"],
+  },
+]).nextScene;
+if (contextScene.objects.length !== 4) {
+  throw new Error("Expected largest target fallback to delete one object");
+}
+
 console.log("Scene schema and executor verification passed");

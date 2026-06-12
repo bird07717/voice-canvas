@@ -356,6 +356,25 @@ function expandTargetIds(scene: SceneState, targetIds: string[]) {
       continue;
     }
 
+    if (targetId === "__last__") {
+      scene.lastCreatedIds.forEach((id) => {
+        if (objectIds.has(id)) {
+          resolved.add(id);
+        }
+      });
+      continue;
+    }
+
+    if (targetId === "__largest__") {
+      const largest = [...scene.objects].sort(
+        (a, b) => getBBox(b.geometry).w * getBBox(b.geometry).h - getBBox(a.geometry).w * getBBox(a.geometry).h,
+      )[0];
+      if (largest) {
+        resolved.add(largest.id);
+      }
+      continue;
+    }
+
     if (objectIds.has(targetId)) {
       resolved.add(targetId);
       continue;

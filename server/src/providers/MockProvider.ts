@@ -13,6 +13,18 @@ export class MockProvider implements ModelProvider {
       return mockResponses.paintBlue;
     }
 
+    if (matchesAny(normalized, ["刚才", "上一个"]) && matchesAny(normalized, ["绿色", "绿"])) {
+      return mockResponses.paintLastGreen;
+    }
+
+    if (matchesAny(normalized, ["最大的", "最大"]) && matchesAny(normalized, ["删除", "删掉"])) {
+      return mockResponses.deleteLargest;
+    }
+
+    if (matchesAny(normalized, ["变大", "放大", "大一点"])) {
+      return mockResponses.scaleCurrentUp;
+    }
+
     if (matchesAny(normalized, ["房子左边", "房子的左边", "房子旁边"])) {
       return mockResponses.circleLeftOfHouse;
     }

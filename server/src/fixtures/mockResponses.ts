@@ -39,6 +39,36 @@ export const mockResponses: Record<string, ParseResult> = {
     reply: "已经往左挪了一点",
     clarify: null,
   },
+  scaleCurrentUp: {
+    understanding: "把当前对象放大一点",
+    operations: [
+      {
+        op: "transform",
+        targetIds: ["__focus__"],
+        action: { kind: "scale", factor: 1.3 },
+      },
+    ],
+    reply: "已经把它放大了一点",
+    clarify: null,
+  },
+  paintLastGreen: {
+    understanding: "把刚才创建的对象改成绿色",
+    operations: [
+      {
+        op: "setStyle",
+        targetIds: ["__last__"],
+        style: { fill: "绿", stroke: "黑", strokeWidth: 2 },
+      },
+    ],
+    reply: "已经把刚才那个改成绿色了",
+    clarify: null,
+  },
+  deleteLargest: {
+    understanding: "删除画布上最大的对象",
+    operations: [{ op: "delete", targetIds: ["__largest__"] }],
+    reply: "已经删掉最大的那个了",
+    clarify: null,
+  },
   undo: {
     understanding: "撤销上一步操作",
     operations: [{ op: "undo" }],
