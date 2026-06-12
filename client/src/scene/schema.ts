@@ -78,6 +78,33 @@ export const positionSchema = z.discriminatedUnion("mode", [
     dx: z.number().optional(),
     dy: z.number().optional(),
   }).strict(),
+  z.object({
+    mode: z.literal("relative"),
+    ref: z.string(),
+    side: z.enum(["left", "right", "above", "below"]),
+    gap: z.number().optional(),
+    dx: z.number().optional(),
+    dy: z.number().optional(),
+  }).strict(),
+  z.object({
+    mode: z.literal("layout"),
+    layoutId: z.string(),
+    type: z.enum(["row", "grid"]),
+    index: z.number().int(),
+    count: z.number().int().positive(),
+    gap: z.number().optional(),
+    align: z.enum(["top", "middle", "bottom"]).optional(),
+    origin: z
+      .object({
+        region: regionSchema,
+        dx: z.number().optional(),
+        dy: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+    cols: z.number().int().positive().optional(),
+    rows: z.number().int().positive().optional(),
+  }).strict(),
 ]);
 
 const createOperationSchema = z.object({

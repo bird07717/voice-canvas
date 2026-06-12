@@ -17,6 +17,10 @@ export function resolvePosition(
     return clampPoint(position.x, position.y, canvas);
   }
 
+  if (position.mode === "relative" || position.mode === "layout") {
+    return clampPoint(canvas.width / 2, canvas.height / 2, canvas);
+  }
+
   const xPositions = {
     left: ANCHOR_MARGIN,
     center: canvas.width / 2,
@@ -46,6 +50,31 @@ export function withPosition(
     x: point.x,
     y: point.y,
   } as SceneGeometry;
+}
+
+export function getDraftSize(geometry: ShapeDraftGeometry): { w: number; h: number } {
+  switch (geometry.shape) {
+    case "circle":
+      return { w: geometry.radius * 2, h: geometry.radius * 2 };
+    case "rect":
+    case "triangle":
+      return { w: geometry.width, h: geometry.height };
+    case "ellipse":
+      return { w: geometry.radiusX * 2, h: geometry.radiusY * 2 };
+    case "line": {
+      const xs = geometry.points.filter((_, index) => index % 2 === 0);
+      const ys = geometry.points.filter((_, index) => index % 2 === 1);
+      return {
+        w: Math.max(...xs) - Math.min(...xs),
+        h: Math.max(...ys) - Math.min(...ys),
+      };
+    }
+    case "text":
+      return {
+        w: Math.max(geometry.content.length * geometry.fontSize, 1),
+        h: geometry.fontSize * 1.25,
+      };
+  }
 }
 
 export function getBBox(geometry: SceneGeometry): BBox {

@@ -89,4 +89,67 @@ if (voiceScene.objects.length !== 1) {
   throw new Error("Expected voice loop verification to create one object");
 }
 
+const relativeScene = applyOperations(createInitialSceneState(), [
+  {
+    op: "create",
+    tempId: "base",
+    geometry: { shape: "circle", radius: 50 },
+    position: { mode: "anchor", region: "center" },
+    label: "基础圆",
+  },
+  {
+    op: "create",
+    geometry: { shape: "rect", width: 80, height: 80 },
+    position: { mode: "relative", ref: "base", side: "left", gap: 40 },
+    label: "左侧方块",
+  },
+]).nextScene;
+if (relativeScene.objects.length !== 2) {
+  throw new Error("Expected relative create to add two objects");
+}
+if ((relativeScene.objects[1]?.geometry.x ?? 0) >= (relativeScene.objects[0]?.geometry.x ?? 0)) {
+  throw new Error("Expected relative object to be placed on the left");
+}
+
+const rowScene = applyOperations(createInitialSceneState(), [
+  ...[0, 1, 2, 3, 4].map((index) => ({
+    op: "create" as const,
+    geometry: { shape: "circle" as const, radius: 20 + index * 10 },
+    position: {
+      mode: "layout" as const,
+      layoutId: "row-1",
+      type: "row" as const,
+      index,
+      count: 5,
+      gap: 20,
+    },
+    label: `圆${index + 1}`,
+  })),
+]).nextScene;
+if (rowScene.objects.length !== 5) {
+  throw new Error("Expected row layout to create five objects");
+}
+if (!rowScene.objects.every((object, index, objects) => index === 0 || object.geometry.x > objects[index - 1].geometry.x)) {
+  throw new Error("Expected row layout x positions to increase");
+}
+
+const groupScene = applyOperations(createInitialSceneState(), [
+  { op: "createGroup", groupId: "grp_test", label: "测试组" },
+  {
+    op: "create",
+    groupId: "grp_test",
+    geometry: { shape: "rect", width: 100, height: 80 },
+    position: { mode: "anchor", region: "center" },
+    label: "组成员",
+  },
+  {
+    op: "transform",
+    targetIds: ["grp_test"],
+    action: { kind: "move", dx: -80, dy: 0 },
+  },
+]).nextScene;
+if ((groupScene.objects[0]?.geometry.x ?? 0) >= 600) {
+  throw new Error("Expected group move to move member left");
+}
+
 console.log("Scene schema and executor verification passed");

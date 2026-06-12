@@ -132,7 +132,27 @@ export type AnchorRegion =
 
 export type Position =
   | { mode: "absolute"; x: number; y: number }
-  | { mode: "anchor"; region: AnchorRegion; dx?: number; dy?: number };
+  | { mode: "anchor"; region: AnchorRegion; dx?: number; dy?: number }
+  | {
+      mode: "relative";
+      ref: string;
+      side: "left" | "right" | "above" | "below";
+      gap?: number;
+      dx?: number;
+      dy?: number;
+    }
+  | {
+      mode: "layout";
+      layoutId: string;
+      type: "row" | "grid";
+      index: number;
+      count: number;
+      gap?: number;
+      align?: "top" | "middle" | "bottom";
+      origin?: { region: AnchorRegion; dx?: number; dy?: number };
+      cols?: number;
+      rows?: number;
+    };
 
 export type CreateOperation = {
   op: "create";
