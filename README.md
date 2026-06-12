@@ -35,6 +35,7 @@ The Vite client runs on `http://localhost:5173`. The Express API runs on `http:/
 | `PORT` | Express API port. Defaults to `3001`. |
 | `ANTHROPIC_API_KEY` | Claude API key for the future `ClaudeProvider`. |
 | `ANTHROPIC_BASE_URL` | Optional Anthropic-compatible base URL override. |
+| `ANTHROPIC_MODEL` | Optional Claude model override for local experiments. |
 | `DEEPSEEK_API_KEY` | DeepSeek API key for the future fallback provider. |
 | `DEEPSEEK_BASE_URL` | Optional DeepSeek OpenAI-compatible base URL override. |
 
