@@ -13,16 +13,24 @@ export class MockProvider implements ModelProvider {
       return mockResponses.paintBlue;
     }
 
+    if (matchesAny(normalized, ["房子左边", "房子的左边", "房子旁边"])) {
+      return mockResponses.circleLeftOfHouse;
+    }
+
+    if (matchesAny(normalized, ["3x3", "三乘三", "网格"])) {
+      return mockResponses.drawGridCircles;
+    }
+
+    if (matchesAny(normalized, ["五个", "5个", "五只", "一排"])) {
+      return mockResponses.drawFiveCircles;
+    }
+
     if (matchesAny(normalized, ["往左", "向左", "左移"])) {
       return mockResponses.moveLeft;
     }
 
     if (matchesAny(normalized, ["房子", "小房子"])) {
       return mockResponses.drawHouse;
-    }
-
-    if (matchesAny(normalized, ["五个", "5个", "五只", "一排"])) {
-      return mockResponses.drawFiveCircles;
     }
 
     if (matchesAny(normalized, ["红色的圆", "红圆", "画圆", "一个圆"])) {
