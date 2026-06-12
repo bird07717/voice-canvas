@@ -69,13 +69,13 @@ function App() {
       <section className="canvas-area" aria-label="Voice canvas preview">
         <div className="canvas-toolbar">
           <div>
-            <p className="eyebrow">Scene graph canvas</p>
+            <p className="eyebrow">场景图画布</p>
             <h1>Voice-Canvas</h1>
           </div>
           <div className="metric-strip" aria-label="Scene metrics">
-            <span>{scene.objects.length} objects</span>
-            <span>{scene.groups.length} groups</span>
-            <span>{scene.focusIds.length} focused</span>
+            <span>{scene.objects.length} 对象</span>
+            <span>{scene.groups.length} 组合</span>
+            <span>{scene.focusIds.length} 焦点</span>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ function App() {
           <SceneRenderer scene={scene} />
           {scene.objects.length === 0 ? (
             <div className="empty-canvas">
-              Use the debug controls to feed operations into the executor.
+              说“画一个红色的圆”，或用右侧转写输入进行本地验证。
             </div>
           ) : null}
         </div>
@@ -91,24 +91,24 @@ function App() {
 
       <aside className="sidebar">
         <div>
-          <p className="eyebrow">Phase 2</p>
-          <h2>Voice execution loop</h2>
+          <p className="eyebrow">收尾阶段</p>
+          <h2>容错与思考流</h2>
           <p className="summary">
-            Final transcripts are parsed through the local API, validated, and
-            applied to the same scene executor.
+            危险操作先确认，模糊指令先澄清，standby 下只响应唤醒词。
           </p>
         </div>
 
         <div className={`health-card health-card--${health.status}`}>
           <span className="health-dot" aria-hidden="true" />
           <div>
-            <h2>API health</h2>
+            <h2>API 健康</h2>
             <p>{getHealthLabel(health)}</p>
           </div>
         </div>
 
         <VoicePanel
           mode={voiceLoop.mode}
+          model={voiceLoop.model}
           partialTranscript={voiceLoop.partialTranscript}
           lastTranscript={voiceLoop.lastTranscript}
           lastReply={voiceLoop.lastReply}
@@ -152,14 +152,14 @@ function App() {
 
 function getHealthLabel(health: HealthState) {
   if (health.status === "checking") {
-    return "Checking /api/health...";
+    return "正在检查 /api/health...";
   }
 
   if (health.status === "error") {
-    return `Unavailable: ${health.message}`;
+    return `不可用：${health.message}`;
   }
 
-  return `${health.service} responded`;
+  return `${health.service} 已响应`;
 }
 
 export default App;

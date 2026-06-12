@@ -18,46 +18,46 @@ export function DebugPanel({
   return (
     <section className="debug-panel" aria-labelledby="debug-title">
       <div>
-        <p className="eyebrow">Phase 1 debug controls</p>
-        <h2 id="debug-title">Execution layer</h2>
+        <p className="eyebrow">开发入口</p>
+        <h2 id="debug-title">执行层调试</h2>
         <p className="panel-copy">
-          Buttons feed validated operations into the scene executor.
+          这些按钮只用于本地验证，正式演示路径仍以语音为主。
         </p>
       </div>
 
       <div className="button-grid">
         <button type="button" onClick={() => onApply([createCircle()])}>
-          Draw circle
+          画圆
         </button>
         <button type="button" onClick={() => onApply([createRect()])}>
-          Draw square
+          画方块
         </button>
         <button type="button" onClick={() => onApply([createTriangle()])}>
-          Draw triangle
+          画三角形
         </button>
         <button type="button" onClick={() => onApply([createLine()])}>
-          Draw line
+          画线
         </button>
         <button type="button" onClick={() => onApply([paintFocusedBlue()])}>
-          Paint blue
+          改蓝
         </button>
         <button type="button" onClick={() => onApply([moveFocusedLeft()])}>
-          Move left
+          左移
         </button>
         <button type="button" onClick={() => onApply([scaleFocusedUp()])}>
-          Scale up
+          放大
         </button>
         <button type="button" onClick={() => onApply([deleteFocused()])}>
-          Delete
+          删除
         </button>
         <button type="button" disabled={!canUndo} onClick={() => onApply([{ op: "undo" }])}>
-          Undo
+          撤销
         </button>
         <button type="button" disabled={!canRedo} onClick={() => onApply([{ op: "redo" }])}>
-          Redo
+          重做
         </button>
         <button type="button" disabled={objectCount === 0} onClick={() => onApply([{ op: "clear" }])}>
-          Clear
+          清空
         </button>
       </div>
 

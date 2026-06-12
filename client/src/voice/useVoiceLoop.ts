@@ -33,6 +33,7 @@ type VoiceLoopOptions = {
 export type ThoughtStep = {
   label: string;
   detail: string;
+  tone?: "info" | "success" | "warning" | "danger" | "muted";
 };
 
 export function useVoiceLoop({
@@ -52,7 +53,7 @@ export function useVoiceLoop({
   const [clarify, setClarify] = useState<ResponseEnvelope["clarify"]>(null);
   const [error, setError] = useState<string | null>(null);
   const [thoughts, setThoughts] = useState<ThoughtStep[]>([
-    { label: "Ready", detail: "Start listening or use text input." },
+    { label: "待命", detail: "等待语音或文本转写输入。", tone: "muted" },
   ]);
 
   const setMode = useCallback((nextMode: ListenMode) => {
@@ -60,22 +61,30 @@ export function useVoiceLoop({
     setModeState(nextMode);
   }, []);
 
-  const pushThought = useCallback((label: string, detail: string) => {
-    setThoughts((current) => [...current.slice(-5), { label, detail }]);
-  }, []);
+  const pushThought = useCallback(
+    (
+      label: string,
+      detail: string,
+      tone: ThoughtStep["tone"] = "info",
+    ) => {
+      setThoughts((current) => [...current.slice(-5), { label, detail, tone }]);
+    },
+    [],
+  );
 
   const appendRecentTurns = useCallback((turns: RecentTurn[]) => {
     recentTurnsRef.current = [...recentTurnsRef.current, ...turns].slice(-6);
   }, []);
 
   const speak = useCallback(
-    (text: string | null) => {
+    (text: string | null, afterMode: ListenMode = "active") => {
       if (!text) {
         return;
       }
 
       setLastReply(text);
       if (!("speechSynthesis" in window)) {
+        setMode(afterMode);
         return;
       }
 
@@ -87,7 +96,7 @@ export function useVoiceLoop({
       setMode("speaking");
       utterance.onend = () => {
         if (modeRef.current === "speaking") {
-          setMode("active");
+          setMode(afterMode);
         }
       };
       window.speechSynthesis.speak(utterance);
@@ -104,14 +113,14 @@ export function useVoiceLoop({
 
       setLastTranscript(transcript);
       setPartialTranscript("");
-      pushThought("Recognized", transcript);
+      pushThought("已识别", transcript, "info");
 
       const pendingAction = getScene().pendingAction;
       if (pendingAction) {
         if (isConfirmCommand(transcript)) {
           setMode("executing");
           const report = confirmPendingAction();
-          pushThought("Confirmed", `${report.okCount} operations executed.`);
+          pushThought("已确认", `${report.okCount} 个操作已执行。`, "success");
           speak(report.okCount > 0 ? "已确认，画布已清空" : "已确认，但没有可执行的内容");
           if (report.okCount === 0) {
             setMode("active");
@@ -121,36 +130,36 @@ export function useVoiceLoop({
 
         cancelPendingAction();
         setClarify(null);
-        pushThought("Canceled", "Pending dangerous action was canceled.");
+        pushThought("已取消", "待确认的危险操作已取消。", "warning");
 
         if (isCancelCommand(transcript)) {
           speak("已取消这次清空操作");
           return;
         }
 
-        pushThought("Continuing", "Handling the new transcript normally.");
+        pushThought("继续处理", "已取消待确认操作，继续处理当前转写。", "info");
       }
 
       if (isPauseCommand(transcript)) {
         setMode("standby");
-        pushThought("Standby", "Only resume commands will be handled.");
-        speak("已暂停监听，说继续可以恢复");
+        pushThought("暂停态", "只响应继续、开始绘图等唤醒词。", "warning");
+        speak("已暂停监听，说继续可以恢复", "standby");
         return;
       }
 
       if (modeRef.current === "standby") {
         if (isResumeCommand(transcript)) {
           setMode("active");
-          pushThought("Active", "Full parsing resumed.");
+          pushThought("监听态", "已恢复完整解析。", "success");
           speak("继续监听");
         } else {
-          pushThought("Ignored", "Standby mode ignored this transcript.");
+          pushThought("已忽略", "standby 下不调用模型，也不执行绘图。", "muted");
         }
         return;
       }
 
       setMode("parsing");
-      pushThought("Parsing", "Calling mock provider through /api/parse.");
+      pushThought("模型解析", "通过 /api/parse 调用 mock 路由。", "info");
       setClarify(null);
       setError(null);
 
@@ -173,16 +182,16 @@ export function useVoiceLoop({
             { role: "user", content: transcript },
             { role: "assistant", content: envelope.clarify.question },
           ]);
-          pushThought("Clarify", envelope.clarify.question);
+          pushThought("需要澄清", envelope.clarify.question, "warning");
           speak(envelope.clarify.question);
-          setMode("active");
           return;
         }
 
         setMode("executing");
         pushThought(
-          "Executing",
-          `${envelope.operations.length} operations from ${envelope.understanding}.`,
+          "执行器",
+          summarizeOperations(envelope.operations, envelope.understanding),
+          "info",
         );
         const report = apply(envelope.operations);
         appendRecentTurns([
@@ -194,14 +203,14 @@ export function useVoiceLoop({
         ]);
         const pending = getScene().pendingAction;
         if (pending) {
-          pushThought("Pending", "Dangerous action is waiting for confirmation.");
+          pushThought("等待确认", "危险操作已进入 pendingAction。", "warning");
           speak("确定要清空画布吗？说确定继续，说取消放弃");
           return;
         }
 
         if (report.failCount > 0) {
           const reason = envelope.reply ?? formatIssueReason(report);
-          pushThought("Fallback", reason || "Some operations were skipped.");
+          pushThought("容错反馈", reason || "部分操作被跳过。", "warning");
           speak(reason);
           if (!reason) {
             setMode("active");
@@ -209,7 +218,7 @@ export function useVoiceLoop({
           return;
         }
 
-        pushThought("Done", envelope.understanding);
+        pushThought("已执行", envelope.understanding, "success");
         speak(envelope.reply);
         if (!envelope.reply) {
           setMode("active");
@@ -217,7 +226,7 @@ export function useVoiceLoop({
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Unknown parse error";
         setError(message);
-        pushThought("Error", message);
+        pushThought("错误", message, "danger");
         setMode("active");
       }
     },
@@ -258,12 +267,12 @@ export function useVoiceLoop({
 
       if (partial) {
         setPartialTranscript(partial);
-        pushThought("Listening", partial);
+        pushThought("正在听", partial, "info");
       }
     };
     recognition.onerror = (event) => {
       setError(event.error);
-      pushThought("ASR error", event.error);
+      pushThought("识别错误", event.error, "danger");
     };
     recognition.onend = () => {
       if (modeRef.current !== "idle") {
@@ -273,14 +282,14 @@ export function useVoiceLoop({
     recognition.start();
     recognitionRef.current = recognition;
     setMode("active");
-    pushThought("Listening", "Microphone recognition started.");
+    pushThought("正在听", "麦克风识别已启动。", "success");
   }, [handleFinalTranscript, pushThought, setMode]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     setMode("idle");
-    pushThought("Stopped", "Microphone recognition stopped.");
+    pushThought("已停止", "麦克风识别已停止。", "muted");
   }, [pushThought, setMode]);
 
   return {
@@ -291,8 +300,36 @@ export function useVoiceLoop({
     clarify,
     error,
     thoughts,
+    model: "mock" as const,
     startListening,
     stopListening,
     handleFinalTranscript,
   };
+}
+
+function summarizeOperations(
+  operations: ResponseEnvelope["operations"],
+  understanding: string,
+) {
+  if (operations.length === 0) {
+    return `${understanding}；没有生成绘图操作。`;
+  }
+
+  const layoutCount = operations.filter(
+    (operation) => operation.op === "create" && operation.position.mode === "layout",
+  ).length;
+  const groupCount = operations.filter(
+    (operation) => operation.op === "createGroup",
+  ).length;
+  const parts = [`${operations.length} 个操作`];
+
+  if (layoutCount > 0) {
+    parts.push(`${layoutCount} 个交给布局器`);
+  }
+
+  if (groupCount > 0) {
+    parts.push(`${groupCount} 个组合索引`);
+  }
+
+  return `${parts.join("，")}；${understanding}`;
 }
