@@ -43,7 +43,7 @@
 | 层 | 选型 | 说明 |
 |---|---|---|
 | 前端框架 | **React + TypeScript + Vite** | `react-konva` 生态成熟，Zod/TS 类型集成顺，社区资料与 AI 辅助准确度最高 |
-| 语音识别（ASR） | 浏览器 Web Speech API | 实时、免费、零部署；口音/噪声差时可降级 Whisper。状态机见 `大脑设计.md` §6 |
+| 语音识别（ASR） | **后端百度 ASR 主路径 + 浏览器 Web Speech 备用** | T5 起新增后端 ASR：前端录音，后端藏百度 key 并调用短语音识别 REST API；单段音频强制小于 60 秒。Web Speech 仅作开发/备用模式。状态机见 `大脑设计.md` §7 |
 | 意图解析 | LLM 调用 | 自然语言 → 结构化 JSON（动作/图形/坐标/颜色/数量/目标） |
 | 画布执行层 | **Konva.js + react-konva** | 对象模型清晰、与场景图一一映射；Fabric.js 的鼠标交互能力在纯语音场景中不是重点 |
 | 状态管理 | **Zustand**（场景图存前端内存） | 数据与渲染解耦，避免 re-render 卡顿 |
@@ -54,11 +54,25 @@
 
 ```text
 /client  React + TypeScript + Vite + react-konva
-/server  Express + 模型 Provider Adapter
+/server  Express + 模型 Provider Adapter + ASR Provider Adapter
 npm run dev  使用 concurrently 同时启动 Vite 与 Express
 ```
 
 不采用 Next API 或 Vite middleware 作为 P0：项目不需要服务端渲染，Vite middleware 虽然能少起一个进程，但调试边界更绕。Express + Vite proxy 更直白、更适合两天内稳定交付。
+
+### T5 后端 ASR 补强（新增决策）
+
+浏览器 Web Speech API 在当前本机环境出现漏听和 `network` 错误，因此正式演示链路不再把它作为唯一 ASR 依赖。新增语音输入分层：
+
+```
+麦克风录音  →  前端录音窗口/静音检测  →  /api/asr  →  百度 ASR  →  transcript  →  /api/parse
+```
+
+- **后端藏 key**：百度 `API Key` / `Secret Key` 只在 `/server/.env`，前端只上传音频。
+- **短指令策略**：百度短语音识别单次请求限制在 60 秒以内；MVP 默认 8–12 秒短指令窗口，55 秒硬停止上传。
+- **格式策略**：优先统一为 16kHz、单声道、PCM/WAV；如浏览器输出格式不同，转换逻辑集中在录音/ASR adapter。
+- **失败降级**：百度未配置、网络失败或音频无效时，不执行旧 transcript；前端提示可重试，并可按配置降级到 Web Speech / 转写测试输入。
+- **开发入口收束**：“执行层调试”“转写测试输入”保留到开发期，但正式模式通过 `VITE_ENABLE_DEV_TOOLS=false` 隐藏。
 
 ### 性能注意（避免卡顿）
 
@@ -192,6 +206,7 @@ interface ModelProvider {
 
 - 铁律：真实 key 绝不进公开仓库，只通过环境变量运行时注入。
 - 本地跑时 `.env` 里有 key，正常使用、正常录视频。
+- 百度 ASR 同样遵循此规则：`BAIDU_ASR_API_KEY` / `BAIDU_ASR_SECRET_KEY` 只放后端 `.env`，前端不得出现真实凭据。
 - （可选，5 分钟）厂商后台设消费上限兜底。
 - **已砍掉**：在线部署、来源校验、限流、用户自带 key 输入框。
 
@@ -213,6 +228,7 @@ interface ModelProvider {
 | Day1 下午 | 定义 Zod schema + 接 Web Speech API（ASR 状态机）+ LLM 解析成 JSON，打通"说话→画图"最小闭环 |
 | Day2 上午 | 布局解析器（anchor/row/grid/relative）+ group 对象 + 复杂指令拆解 + 模型路由/故障转移 |
 | Day2 下午 | 容错澄清（含危险指令二次确认）+ 侧边栏实时思考流 + UI 打磨 + 写设计文档 + 录演示视频 |
+| T5 补强阶段 | 后端百度 ASR：配置鉴权、`/api/asr`、前端录音上传、60 秒上限保护、ASR 模式切换、隐藏开发调试入口 |
 
 **明确不做**：多人协作、云端存储、识别一切自然语言、多模型自由选择、在线部署、Docker。
 
@@ -221,5 +237,5 @@ interface ModelProvider {
 ## 十、待定 / 下一步
 
 - **项目命名**：候选 `voice-canvas`（直白）/ `canvox`（造词，更有辨识度、不撞名）。待定。
-- **项目大脑（已完成设计，见 `大脑设计.md` v2）**：场景图 + group 索引、四选一定位模型、确定性布局器、Zod 严格 schema、ASR 状态机、危险指令二次确认、拆解 prompt 均已定稿。
-- **下一步**：画整体架构图（标清自研层 vs 框架层）→ 工程初始化（脚手架、目录、依赖、`.env.example`、后端代理骨架）→ 编码。
+- **项目大脑（已完成设计，见 `大脑设计.md` v2）**：场景图 + group 索引、四选一定位模型、确定性布局器、Zod 严格 schema、ASR 状态机、危险指令二次确认、拆解 prompt 均已定稿；T5 新增后端 ASR provider，不改变后续语义解析/执行层契约。
+- **下一步**：按 `开发任务清单.md` 阶段 5 实现百度 ASR 后端识别模式，优先保证“录音 → 转写 → 解析 → 绘图”闭环可运行。
