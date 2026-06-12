@@ -37,6 +37,10 @@ export class MockProvider implements ModelProvider {
       return mockResponses.drawFiveCircles;
     }
 
+    if (matchesAny(normalized, ["三个", "3个", "三只"])) {
+      return mockResponses.drawThreeCircles;
+    }
+
     if (matchesAny(normalized, ["往左", "向左", "左移"])) {
       return mockResponses.moveLeft;
     }

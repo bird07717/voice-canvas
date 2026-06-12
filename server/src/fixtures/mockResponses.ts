@@ -144,6 +144,26 @@ export const mockResponses: Record<string, ParseResult> = {
     reply: "画好了五个由小到大的圆",
     clarify: null,
   },
+  drawThreeCircles: {
+    understanding: "创建三个并排的圆",
+    operations: [0, 1, 2].map((index) => ({
+      op: "create",
+      geometry: { shape: "circle", radius: 44 },
+      style: { fill: ["红", "黄", "蓝"][index], stroke: "黑", strokeWidth: 2 },
+      position: {
+        mode: "layout",
+        layoutId: "three-circles",
+        type: "row",
+        index,
+        count: 3,
+        gap: 32,
+        align: "middle",
+      },
+      label: `圆${index + 1}`,
+    })),
+    reply: "画好了三个圆",
+    clarify: null,
+  },
   drawGridCircles: {
     understanding: "创建一个 3x3 的网格圆",
     operations: Array.from({ length: 9 }, (_, index) => ({
