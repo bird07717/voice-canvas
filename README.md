@@ -38,6 +38,7 @@ The Vite client runs on `http://localhost:5173`. The Express API runs on `http:/
 | `ANTHROPIC_MODEL` | Optional Claude model override for local experiments. |
 | `DEEPSEEK_API_KEY` | DeepSeek API key for the future fallback provider. |
 | `DEEPSEEK_BASE_URL` | Optional DeepSeek OpenAI-compatible base URL override. |
+| `DEEPSEEK_MODEL` | Optional DeepSeek model override for local experiments. |
 
 ## Project Structure
 
