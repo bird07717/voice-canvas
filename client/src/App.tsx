@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { DebugPanel } from "./components/DebugPanel";
 import { SceneRenderer } from "./components/SceneRenderer";
+import { VoicePanel } from "./components/VoicePanel";
 import { useSceneStore } from "./scene/store";
 import type { ExecReport, Operation } from "./scene/types";
+import { useVoiceLoop } from "./voice/useVoiceLoop";
 
 type HealthState =
   | { status: "checking" }
@@ -18,6 +20,10 @@ function App() {
   const lastReport = useSceneStore((state) => state.lastReport);
   const apply = useSceneStore((state) => state.apply);
   const reportText = useMemo(() => formatReport(lastReport), [lastReport]);
+  const voiceLoop = useVoiceLoop({
+    getScene: () => useSceneStore.getState().scene,
+    apply,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -80,11 +86,11 @@ function App() {
 
       <aside className="sidebar">
         <div>
-          <p className="eyebrow">Phase 1</p>
-          <h2>Manual execution loop</h2>
+          <p className="eyebrow">Phase 2</p>
+          <h2>Voice execution loop</h2>
           <p className="summary">
-            Scene state, Zod validation, deterministic operations, and Konva
-            rendering now share one contract.
+            Final transcripts are parsed through the local API, validated, and
+            applied to the same scene executor.
           </p>
         </div>
 
@@ -95,6 +101,20 @@ function App() {
             <p>{getHealthLabel(health)}</p>
           </div>
         </div>
+
+        <VoicePanel
+          mode={voiceLoop.mode}
+          partialTranscript={voiceLoop.partialTranscript}
+          lastTranscript={voiceLoop.lastTranscript}
+          lastReply={voiceLoop.lastReply}
+          error={voiceLoop.error}
+          thoughts={voiceLoop.thoughts}
+          onStart={voiceLoop.startListening}
+          onStop={voiceLoop.stopListening}
+          onSubmitTranscript={(transcript) => {
+            void voiceLoop.handleFinalTranscript(transcript);
+          }}
+        />
 
         <DebugPanel
           objectCount={scene.objects.length}

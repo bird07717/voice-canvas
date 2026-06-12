@@ -2,6 +2,7 @@ import { operationSchema } from "./schema";
 import { applyOperations, createInitialSceneState } from "./executor";
 import { useSceneStore } from "./store";
 import { responseEnvelopeSchema } from "../voice/responseEnvelope";
+import { mockVoiceLoop } from "../voice/verify";
 import type { Operation } from "./types";
 
 const validCreate: Operation = {
@@ -81,6 +82,11 @@ if (useSceneStore.getState().scene.objects.length !== 0) {
 useSceneStore.getState().apply([{ op: "redo" }]);
 if (useSceneStore.getState().scene.objects.length !== 1) {
   throw new Error("Expected redo to restore the created object");
+}
+
+const voiceScene = mockVoiceLoop("画一个红色的圆", createInitialSceneState());
+if (voiceScene.objects.length !== 1) {
+  throw new Error("Expected voice loop verification to create one object");
 }
 
 console.log("Scene schema and executor verification passed");
