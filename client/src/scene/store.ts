@@ -15,6 +15,8 @@ type SceneStore = {
   lastReport: ExecReport | null;
   lastError: string | null;
   apply: (operations: Operation[]) => ExecReport;
+  confirmPendingAction: () => ExecReport;
+  cancelPendingAction: () => ExecReport;
   resetDemo: () => void;
 };
 
@@ -46,6 +48,22 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     }
 
     const { scene, undoStack, redoStack } = get();
+    if (needsDangerousConfirmation(scene, parsed.data)) {
+      const report = createSingleResultReport(
+        "skipped",
+        "等待确认：清空画布需要说“确定”继续，或说“取消”放弃。",
+      );
+      set({
+        scene: {
+          ...scene,
+          pendingAction: { type: "clear", ops: parsed.data },
+        },
+        lastReport: report,
+        lastError: null,
+      });
+      return report;
+    }
+
     const before = createSnapshot(scene);
     const { nextScene, report, changed } = applyOperations(scene, parsed.data);
 
@@ -55,6 +73,45 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       redoStack: changed ? [] : redoStack,
       lastReport: report,
       lastError: report.failCount > 0 ? "One or more operations failed" : null,
+    });
+
+    return report;
+  },
+  confirmPendingAction: () => {
+    const { scene, undoStack, redoStack } = get();
+    const pendingAction = scene.pendingAction;
+
+    if (!pendingAction) {
+      const report = createSingleResultReport("skipped", "没有等待确认的操作");
+      set({ lastReport: report, lastError: null });
+      return report;
+    }
+
+    const sceneForExecution = { ...scene, pendingAction: null };
+    const before = createSnapshot(sceneForExecution);
+    const { nextScene, report, changed } = applyOperations(
+      sceneForExecution,
+      pendingAction.ops,
+    );
+
+    set({
+      scene: nextScene,
+      undoStack: changed ? [...undoStack, before] : undoStack,
+      redoStack: changed ? [] : redoStack,
+      lastReport: report,
+      lastError: report.failCount > 0 ? "One or more operations failed" : null,
+    });
+
+    return report;
+  },
+  cancelPendingAction: () => {
+    const { scene } = get();
+    const report = createSingleResultReport("skipped", "已取消等待确认的危险操作");
+
+    set({
+      scene: { ...scene, pendingAction: null },
+      lastReport: report,
+      lastError: null,
     });
 
     return report;
@@ -70,6 +127,90 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     });
   },
 }));
+
+function createSingleResultReport(
+  status: "ok" | "skipped" | "failed",
+  reason: string,
+): ExecReport {
+  if (status === "ok") {
+    return {
+      results: [{ status: "ok", affectedIds: [] }],
+      okCount: 1,
+      failCount: 0,
+    };
+  }
+
+  return {
+    results: [{ status, reason }],
+    okCount: 0,
+    failCount: status === "failed" ? 1 : 0,
+  };
+}
+
+function needsDangerousConfirmation(scene: SceneState, operations: Operation[]) {
+  return operations.some((operation) => {
+    if (operation.op === "clear") {
+      return true;
+    }
+
+    if (operation.op !== "delete" || scene.objects.length === 0) {
+      return false;
+    }
+
+    const targetIds = resolveTargetIdsForGuard(scene, operation.targetIds);
+    return (
+      targetIds.size > 0 &&
+      scene.objects.every((object) => targetIds.has(object.id))
+    );
+  });
+}
+
+function resolveTargetIdsForGuard(scene: SceneState, targetIds: string[]) {
+  const objectIds = new Set(scene.objects.map((object) => object.id));
+  const resolved = new Set<string>();
+
+  for (const targetId of targetIds) {
+    if (targetId === "__focus__") {
+      scene.focusIds.forEach((id) => {
+        if (objectIds.has(id)) {
+          resolved.add(id);
+        }
+      });
+      continue;
+    }
+
+    if (targetId === "__last__") {
+      scene.lastCreatedIds.forEach((id) => {
+        if (objectIds.has(id)) {
+          resolved.add(id);
+        }
+      });
+      continue;
+    }
+
+    if (targetId === "__largest__") {
+      const largest = scene.objects.at(-1);
+      if (largest) {
+        resolved.add(largest.id);
+      }
+      continue;
+    }
+
+    if (objectIds.has(targetId)) {
+      resolved.add(targetId);
+      continue;
+    }
+
+    const group = scene.groups.find((item) => item.id === targetId);
+    group?.memberIds.forEach((id) => {
+      if (objectIds.has(id)) {
+        resolved.add(id);
+      }
+    });
+  }
+
+  return resolved;
+}
 
 export function undoScene(): ExecReport {
   const { scene, undoStack, redoStack } = useSceneStore.getState();

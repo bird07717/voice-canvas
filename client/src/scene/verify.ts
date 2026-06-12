@@ -84,6 +84,28 @@ if (useSceneStore.getState().scene.objects.length !== 1) {
   throw new Error("Expected redo to restore the created object");
 }
 
+useSceneStore.getState().apply([{ op: "clear" }]);
+if (
+  useSceneStore.getState().scene.objects.length !== 1 ||
+  !useSceneStore.getState().scene.pendingAction
+) {
+  throw new Error("Expected clear to wait for confirmation");
+}
+
+useSceneStore.getState().cancelPendingAction();
+if (
+  useSceneStore.getState().scene.objects.length !== 1 ||
+  useSceneStore.getState().scene.pendingAction
+) {
+  throw new Error("Expected canceling pending clear to keep the scene");
+}
+
+useSceneStore.getState().apply([{ op: "clear" }]);
+useSceneStore.getState().confirmPendingAction();
+if (useSceneStore.getState().scene.objects.length !== 0) {
+  throw new Error("Expected confirmed clear to remove all objects");
+}
+
 const voiceScene = mockVoiceLoop("画一个红色的圆", createInitialSceneState());
 if (voiceScene.objects.length !== 1) {
   throw new Error("Expected voice loop verification to create one object");

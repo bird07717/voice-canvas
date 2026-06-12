@@ -9,6 +9,22 @@ export class MockProvider implements ModelProvider {
       return mockResponses.undo;
     }
 
+    if (matchesAny(normalized, ["清空", "清除画布", "全部删掉", "删除全部", "删掉全部"])) {
+      return mockResponses.clearCanvas;
+    }
+
+    if (matchesAny(normalized, ["第十个", "第10个"])) {
+      return mockResponses.deleteMissingObject;
+    }
+
+    if (
+      matchesAny(normalized, ["那个东西", "这个东西", "那东西", "它"]) &&
+      matchesAny(normalized, ["弄红", "变红", "改红", "红色"]) &&
+      countSceneObjects(input) > 1
+    ) {
+      return createAmbiguousClarify(input);
+    }
+
     if (matchesAny(normalized, ["变成蓝色", "改成蓝色", "弄成蓝色"])) {
       return mockResponses.paintBlue;
     }
@@ -49,7 +65,7 @@ export class MockProvider implements ModelProvider {
       return mockResponses.drawHouse;
     }
 
-    if (matchesAny(normalized, ["红色的圆", "红圆", "画圆", "一个圆"])) {
+    if (matchesAny(normalized, ["红色的圆", "红圆", "画圆", "一个圆", "画个圆", "画一个元", "画个元"])) {
       return mockResponses.drawRedCircle;
     }
 
@@ -59,4 +75,30 @@ export class MockProvider implements ModelProvider {
 
 function matchesAny(input: string, patterns: string[]) {
   return patterns.some((pattern) => input.includes(pattern));
+}
+
+function countSceneObjects(input: ParseInput) {
+  return Array.isArray(input.scene?.objects) ? input.scene.objects.length : 0;
+}
+
+function createAmbiguousClarify(input: ParseInput): ParseResult {
+  const objects = Array.isArray(input.scene?.objects) ? input.scene.objects : [];
+  const options = objects.slice(0, 4).map((object, index) => {
+    if (typeof object === "object" && object && "label" in object) {
+      const label = (object as { label?: unknown }).label;
+      if (typeof label === "string" && label.trim()) {
+        return label;
+      }
+    }
+
+    return `对象${index + 1}`;
+  });
+
+  return {
+    ...mockResponses.clarifyAmbiguousObject,
+    clarify: {
+      question: `画布上有多个对象，你是指${options.join("，还是")}？`,
+      options,
+    },
+  };
 }

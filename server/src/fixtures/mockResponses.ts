@@ -75,6 +75,27 @@ export const mockResponses: Record<string, ParseResult> = {
     reply: "已撤销上一步",
     clarify: null,
   },
+  clearCanvas: {
+    understanding: "清空当前画布",
+    operations: [{ op: "clear" }],
+    reply: "确定要清空画布吗？说确定继续，说取消放弃",
+    clarify: null,
+  },
+  clarifyAmbiguousObject: {
+    understanding: "用户想修改对象颜色，但指代不明确",
+    operations: [],
+    reply: null,
+    clarify: {
+      question: "你是指哪一个对象？",
+      options: ["圆", "方块"],
+    },
+  },
+  deleteMissingObject: {
+    understanding: "尝试删除一个不存在的对象",
+    operations: [{ op: "delete", targetIds: ["obj_10"] }],
+    reply: "画布上没有找到第十个对象",
+    clarify: null,
+  },
   drawHouse: {
     understanding: "用一组基础图形创建一个房子",
     operations: [
@@ -201,7 +222,7 @@ export const mockResponses: Record<string, ParseResult> = {
   fallback: {
     understanding: "没有识别为绘图指令",
     operations: [],
-    reply: "这句我还不会画，可以先试试说画一个红色的圆",
+    reply: "没听懂这句绘图指令，可以再说一遍，或者试试说画一个红色的圆",
     clarify: null,
   },
 };

@@ -19,10 +19,14 @@ function App() {
   const redoStack = useSceneStore((state) => state.redoStack);
   const lastReport = useSceneStore((state) => state.lastReport);
   const apply = useSceneStore((state) => state.apply);
+  const confirmPendingAction = useSceneStore((state) => state.confirmPendingAction);
+  const cancelPendingAction = useSceneStore((state) => state.cancelPendingAction);
   const reportText = useMemo(() => formatReport(lastReport), [lastReport]);
   const voiceLoop = useVoiceLoop({
     getScene: () => useSceneStore.getState().scene,
     apply,
+    confirmPendingAction,
+    cancelPendingAction,
   });
 
   useEffect(() => {
@@ -107,6 +111,8 @@ function App() {
           partialTranscript={voiceLoop.partialTranscript}
           lastTranscript={voiceLoop.lastTranscript}
           lastReply={voiceLoop.lastReply}
+          pendingAction={scene.pendingAction}
+          clarify={voiceLoop.clarify}
           error={voiceLoop.error}
           thoughts={voiceLoop.thoughts}
           onStart={voiceLoop.startListening}

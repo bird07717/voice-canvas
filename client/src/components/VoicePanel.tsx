@@ -1,5 +1,7 @@
 import { useState } from "react";
+import type { PendingAction } from "../scene/types";
 import type { ListenMode } from "../voice/asr";
+import type { ResponseEnvelope } from "../voice/responseEnvelope";
 import type { ThoughtStep } from "../voice/useVoiceLoop";
 
 type VoicePanelProps = {
@@ -7,6 +9,8 @@ type VoicePanelProps = {
   partialTranscript: string;
   lastTranscript: string;
   lastReply: string;
+  pendingAction: PendingAction;
+  clarify: ResponseEnvelope["clarify"];
   error: string | null;
   thoughts: ThoughtStep[];
   onStart: () => void;
@@ -19,6 +23,8 @@ export function VoicePanel({
   partialTranscript,
   lastTranscript,
   lastReply,
+  pendingAction,
+  clarify,
   error,
   thoughts,
   onStart,
@@ -38,6 +44,26 @@ export function VoicePanel({
       </div>
 
       <div className={`mode-pill mode-pill--${mode}`}>{mode}</div>
+
+      {pendingAction ? (
+        <div className="pending-banner" role="status" aria-live="polite">
+          <strong>等待确认</strong>
+          <span>清空画布属于危险操作。说“确定”继续，说“取消”放弃。</span>
+        </div>
+      ) : null}
+
+      {clarify ? (
+        <div className="clarify-box" role="status" aria-live="polite">
+          <strong>{clarify.question}</strong>
+          {clarify.options?.length ? (
+            <div className="option-row" aria-label="Clarify options">
+              {clarify.options.map((option) => (
+                <span key={option}>{option}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="voice-actions">
         <button type="button" onClick={onStart}>

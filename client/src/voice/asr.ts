@@ -50,3 +50,11 @@ export function isPauseCommand(transcript: string) {
 export function isResumeCommand(transcript: string) {
   return /继续|开始绘图|继续监听|醒醒/.test(transcript);
 }
+
+export function isConfirmCommand(transcript: string) {
+  return /确定|确认|是的|对|继续|可以|执行/.test(transcript);
+}
+
+export function isCancelCommand(transcript: string) {
+  return /取消|别|不要|不清|算了|停/.test(transcript);
+}
