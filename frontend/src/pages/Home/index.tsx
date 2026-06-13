@@ -4,8 +4,6 @@ import {
   Layout,
   Button,
   Card,
-  Row,
-  Col,
   message,
   Modal,
   Empty,
@@ -17,7 +15,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   DeleteOutlined,
-  EditOutlined,
+  AudioOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { apiService } from '@/services/api'
@@ -116,31 +114,40 @@ export default function Home() {
 
       <Layout>
         <Content className="home-content">
-          <div className="content-header">
-            <h2>我的画布</h2>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreateCanvas}
-              size="large"
-            >
-              新建画布
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="loading-container">
-              <Spin size="large" />
+          <div className="home-workbench">
+            <div className="content-header">
+              <div>
+                <h2>我的画布</h2>
+                <p>选择一个画布，开始用语音控制绘画。</p>
+              </div>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleCreateCanvas}
+                size="large"
+              >
+                新建画布
+              </Button>
             </div>
-          ) : canvases.length === 0 ? (
-            <Empty
-              description="还没有画布，点击新建画布开始创作"
-              style={{ marginTop: 100 }}
-            />
-          ) : (
-            <Row gutter={[24, 24]} className="canvas-grid">
-              {canvases.map((canvas) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={canvas.id}>
+
+            {loading ? (
+              <div className="loading-container">
+                <Spin size="large" />
+              </div>
+            ) : canvases.length === 0 ? (
+              <div className="empty-workbench">
+                <Empty description="还没有画布" />
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleCreateCanvas}
+                >
+                  创建第一张画布
+                </Button>
+              </div>
+            ) : (
+              <div className="canvas-grid">
+                {canvases.map((canvas) => (
                   <Card
                     hoverable
                     className="canvas-card"
@@ -151,36 +158,57 @@ export default function Home() {
                           <img src={canvas.thumbnail_url} alt={canvas.title} />
                         ) : (
                           <div className="thumbnail-placeholder">
-                            <EditOutlined style={{ fontSize: 48 }} />
+                            <div className="thumbnail-toolbar">
+                              <span />
+                              <span />
+                              <span />
+                            </div>
+                            <div className="thumbnail-voice">
+                              <AudioOutlined />
+                              <span>语音绘画</span>
+                            </div>
+                            <svg viewBox="0 0 320 190" className="thumbnail-art">
+                              <circle cx="246" cy="52" r="20" className="thumb-sun" />
+                              <path
+                                d="M54 74h58c10 0 18-7 18-16s-8-16-18-16c-4 0-7 1-10 3-6-10-16-16-28-16-17 0-31 13-31 29 0 6 1 11 4 16h7Z"
+                                className="thumb-cloud"
+                              />
+                              <path d="M88 120l44-36 44 36Z" className="thumb-roof" />
+                              <rect x="100" y="120" width="64" height="48" rx="6" className="thumb-wall" />
+                              <rect x="126" y="140" width="16" height="28" rx="4" className="thumb-door" />
+                              <rect x="218" y="124" width="14" height="42" rx="4" className="thumb-trunk" />
+                              <circle cx="225" cy="108" r="28" className="thumb-tree" />
+                              <circle cx="249" cy="116" r="20" className="thumb-tree-light" />
+                              <path
+                                d="M52 174c46-20 94-21 144-6 42 13 78 8 108-12"
+                                className="thumb-path"
+                              />
+                            </svg>
                           </div>
                         )}
+                        <Button
+                          type="text"
+                          danger
+                          className="canvas-delete-btn"
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => handleDeleteCanvas(canvas.id, e)}
+                          title="删除画布"
+                        />
                       </div>
                     }
-                    actions={[
-                      <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => handleDeleteCanvas(canvas.id, e)}
-                      >
-                        删除
-                      </Button>,
-                    ]}
                   >
-                    <Card.Meta
-                      title={canvas.title}
-                      description={
-                        <>
-                          <p>创建时间: {new Date(canvas.created_at).toLocaleDateString()}</p>
-                          <p>更新时间: {new Date(canvas.updated_at).toLocaleDateString()}</p>
-                        </>
-                      }
-                    />
+                    <div className="canvas-card-body">
+                      <div>
+                        <h3>{canvas.title}</h3>
+                        <p>更新于 {new Date(canvas.updated_at).toLocaleDateString()}</p>
+                      </div>
+                      <span className="canvas-tag">语音绘画</span>
+                    </div>
                   </Card>
-                </Col>
-              ))}
-            </Row>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </Content>
       </Layout>
 
