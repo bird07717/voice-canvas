@@ -265,7 +265,7 @@ class LLMService:
         base_url: str,
         api_key: str,
         model_name: str
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """测试LLM连接"""
         try:
             client = AsyncOpenAI(
@@ -276,11 +276,17 @@ class LLMService:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {"role": "user", "content": "Hello"}
+                    {"role": "user", "content": "Reply with exactly: OK"}
                 ],
-                max_tokens=10
+                temperature=0,
+                max_tokens=50
             )
 
-            return bool(response.choices[0].message.content)
-        except Exception:
-            return False
+            content = response.choices[0].message.content or ""
+            if content.strip():
+                return True, "Connection successful"
+
+            finish_reason = response.choices[0].finish_reason
+            return False, f"Connection returned empty content (finish_reason={finish_reason})"
+        except Exception as e:
+            return False, f"{type(e).__name__}: {str(e)}"
