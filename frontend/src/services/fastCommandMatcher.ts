@@ -21,13 +21,45 @@ const COLOR_MAP: Array<[RegExp, string, string]> = [
   [/橙色?|橙的/, '#f97316', '橙色'],
 ]
 
-const normalizeText = (text: string) =>
-  text
+const normalizeText = (text: string) => {
+  let normalized = text
     .trim()
     .replace(/[，。！？、,.!?:：\s]/g, '')
     .replace(/^请/, '')
     .replace(/^帮我/, '')
     .replace(/^给我/, '')
+    .replace(/选种|选重|选钟|泉州|选州|悬中|选衷/g, '选中')
+    .replace(/原型|圆新|元形|园形|圆行/g, '圆形')
+    .replace(/元|园|圈/g, '圆')
+    .replace(/举型|拒形|矩行|举形/g, '矩形')
+    .replace(/蓝瑟|兰色|蓝的/g, '蓝色')
+    .replace(/红瑟|洪色|红的/g, '红色')
+    .replace(/绿色的|绿的/g, '绿色')
+    .replace(/黄色的|黄的/g, '黄色')
+    .replace(/黑色的|黑的/g, '黑色')
+    .replace(/白色的|白的/g, '白色')
+    .replace(/紫色的|紫的/g, '紫色')
+    .replace(/粉色的|粉的/g, '粉色')
+    .replace(/橙色的|橙的/g, '橙色')
+    .replace(/有上角|又上角/g, '右上角')
+    .replace(/有下角|又下角/g, '右下角')
+    .replace(/网左|望左/g, '往左')
+    .replace(/网右|望右/g, '往右')
+    .replace(/网上|望上/g, '往上')
+    .replace(/网下|望下/g, '往下')
+    .replace(/房大/g, '放大')
+    .replace(/边大/g, '变大')
+    .replace(/边小/g, '变小')
+    .replace(/删了|删掉了/g, '删掉')
+    .replace(/到处|导出/g, '导出')
+
+  normalized = normalized
+    .replace(/^选中$/, '选中当前')
+    .replace(/^选择$/, '选择当前')
+    .replace(/^点一下$/, '点一下当前')
+
+  return normalized
+}
 
 const createId = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -53,11 +85,39 @@ const resolveContextTarget = (context: CanvasCommandContext) =>
   context.objects[context.objects.length - 1]?.id ||
   null
 
-const needsTarget = (context: CanvasCommandContext) => {
-  const target = resolveContextTarget(context)
-  if (target) return target
-  return null
+const KIND_ALIASES: Array<[RegExp, string[], string]> = [
+  [/圆|圆形/, ['circle', 'round'], '圆形'],
+  [/矩形|长方形|方块|方形|正方形/, ['rect', 'rectangle', 'square'], '矩形'],
+  [/线|直线|线条/, ['line'], '线条'],
+  [/星星|五角星/, ['star'], '星星'],
+  [/文字|文本|字/, ['text'], '文字'],
+  [/房子/, ['house'], '房子'],
+  [/树/, ['tree'], '树'],
+  [/太阳/, ['sun'], '太阳'],
+  [/云/, ['cloud'], '云'],
+  [/花/, ['flower'], '花'],
+  [/人|小人/, ['person'], '小人'],
+  [/车|汽车/, ['car'], '汽车'],
+]
+
+const findTargetByKind = (text: string, context: CanvasCommandContext) => {
+  const alias = KIND_ALIASES.find(([pattern]) => pattern.test(text))
+  if (!alias) return null
+
+  const [, kinds] = alias
+  const matched = [...context.objects]
+    .reverse()
+    .find((obj) => {
+      const type = String(obj.type || '').toLowerCase()
+      const kind = String(obj.kind || '').toLowerCase()
+      return kinds.includes(type) || kinds.includes(kind)
+    })
+
+  return matched?.id || null
 }
+
+const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>
+  findTargetByKind(text, context) || resolveContextTarget(context)
 
 const commandResult = (
   interpretation: string,
@@ -98,23 +158,23 @@ export function matchFastCommand(
     return controlResult('停止当前语音识别', 'cancel', '已停止语音识别')
   }
 
-  if (/^(继续听|开始听|继续识别)$/.test(text)) {
+  if (/^(继续听|开始听|继续识别|接着听)$/.test(text)) {
     return controlResult('继续语音识别', 'continue', '继续听')
   }
 
-  if (/^(保存|保存画布)$/.test(text)) {
+  if (/^(保存|保存画布|保存一下|存一下)$/.test(text)) {
     return controlResult('保存当前画布', 'save')
   }
 
-  if (/^(导出|导出PNG|导出图片|下载图片)$/.test(text)) {
+  if (/^(导出|导出PNG|导出图片|下载图片|导出一下|下载一下)$/.test(text)) {
     return controlResult('导出 PNG 图片', 'export')
   }
 
-  if (/^(撤销|退回一步|上一步)$/.test(text)) {
+  if (/^(撤销|退回一步|上一步|退一步|回退)$/.test(text)) {
     return commandResult('撤销上一步', [{ action: 'undo' }])
   }
 
-  if (/^(重做|恢复一步|下一步)$/.test(text)) {
+  if (/^(重做|恢复一步|下一步|恢复|再做)$/.test(text)) {
     return commandResult('重做下一步', [{ action: 'redo' }])
   }
 
@@ -122,8 +182,8 @@ export function matchFastCommand(
     return commandResult('清空画布', [{ action: 'clear' }])
   }
 
-  if (/^(删除它|删掉它|删除这个|删掉这个|删除选中|删掉选中)$/.test(text)) {
-    const target = needsTarget(context)
+  if (/^(删除|删掉|去掉|移除)(它|这个|选中|当前)?$/.test(text) || /^(删除|删掉|去掉|移除).*(圆|圆形|矩形|长方形|线|星星|文字|房子|树|太阳|云|花|人|车)$/.test(text)) {
+    const target = resolveSpokenTarget(text, context)
     if (!target) {
       return {
         matched: true,
@@ -135,9 +195,25 @@ export function matchFastCommand(
     return commandResult('删除选中对象', [{ action: 'delete', target }])
   }
 
-  const target = resolveContextTarget(context)
+  const selectTarget = findTargetByKind(text, context)
+  if (/^(选中|选择|选一下|点一下|点选).+/.test(text)) {
+    const target = selectTarget || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context) : null)
+    if (!target) {
+      return {
+        matched: true,
+        interpretation: '选择对象',
+        errorMessage: '没有找到要选择的对象，请换一种说法或直接点一下对象。',
+      }
+    }
 
-  if (/^(把它|把这个|将它|将这个)?变(成)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text)) {
+    return commandResult('选择对象', [
+      { action: 'select', target },
+    ] as DrawCommand[])
+  }
+
+  const target = resolveSpokenTarget(text, context)
+
+  if (/^(把|将)?(它|这个|选中|当前)?(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -159,7 +235,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(把它|把这个|将它|将这个)?(变|放)(大|大一点|大一些)|^放大它?$/.test(text)) {
+  if (/^(把|将)?(它|这个|选中|当前)?(变|放|弄)?(大|大一点|大一些)|^放大(它|这个|选中)?$|^(大一点|再大一点)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -173,7 +249,7 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  if (/^(把它|把这个|将它|将这个)?(变|缩)(小|小一点|小一些)|^缩小它?$/.test(text)) {
+  if (/^(把|将)?(它|这个|选中|当前)?(变|缩|弄)?(小|小一点|小一些)|^缩小(它|这个|选中)?$|^(小一点|再小一点)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -188,10 +264,10 @@ export function matchFastCommand(
   }
 
   const moveMap: Array<[RegExp, string, number, number]> = [
-    [/^(左移|往左|向左|向左挪|往左挪)/, '左移一点', -40, 0],
-    [/^(右移|往右|向右|向右挪|往右挪)/, '右移一点', 40, 0],
-    [/^(上移|往上|向上|向上挪|往上挪)/, '上移一点', 0, -40],
-    [/^(下移|往下|向下|向下挪|往下挪)/, '下移一点', 0, 40],
+    [/(左移|往左|向左|向左挪|往左挪|左边一点|靠左一点)/, '左移一点', -40, 0],
+    [/(右移|往右|向右|向右挪|往右挪|右边一点|靠右一点)/, '右移一点', 40, 0],
+    [/(上移|往上|向上|向上挪|往上挪|上面一点|靠上一点)/, '上移一点', 0, -40],
+    [/(下移|往下|向下|向下挪|往下挪|下面一点|靠下一点)/, '下移一点', 0, 40],
   ]
   const moveMatch = moveMap.find(([pattern]) => pattern.test(text))
   if (moveMatch) {
@@ -209,12 +285,12 @@ export function matchFastCommand(
   }
 
   const cornerMap: Array<[RegExp, string, number, number]> = [
-    [/(移动|移到|移动到|放到|放在)?左上角$/, '移动到左上角', 130, 110],
-    [/(移动|移到|移动到|放到|放在)?右上角$/, '移动到右上角', 670, 110],
-    [/(移动|移到|移动到|放到|放在)?左下角$/, '移动到左下角', 130, 490],
-    [/(移动|移到|移动到|放到|放在)?右下角$/, '移动到右下角', 670, 490],
-    [/(移动|移到|移动到|放到|放在)?中间$/, '移动到画布中间', 400, 300],
-    [/(移动|移到|移动到|放到|放在)?中央$/, '移动到画布中央', 400, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?左上角$/, '移动到左上角', 130, 110],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?右上角$/, '移动到右上角', 670, 110],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?左下角$/, '移动到左下角', 130, 490],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?右下角$/, '移动到右下角', 670, 490],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(中间|中间位置)$/, '移动到画布中间', 400, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?中央$/, '移动到画布中央', 400, 300],
   ]
   const cornerMatch = cornerMap.find(([pattern]) => pattern.test(text))
   if (cornerMatch) {
@@ -232,9 +308,9 @@ export function matchFastCommand(
   }
 
   const color = getShapeColor(text)
-  const shapePrefix = '(画|换一个|换个|来一个|来个|创建|生成|加一个|加个)'
+  const shapePrefix = '(画|画个|画一个|换一个|换个|来一个|来个|创建|生成|加一个|加个|弄一个|做一个)'
 
-  if (new RegExp(`^${shapePrefix}.*(圆|圆形)$`).test(text) || /^(画圆|画个圆)$/.test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(圆|圆形)$`).test(text) || /^(画圆|画个圆|来个圆)$/.test(text)) {
     const label = `${color.label || ''}圆形`
     return commandResult(`创建${label}`, [
       {
@@ -254,7 +330,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (new RegExp(`^${shapePrefix}.*(矩形|长方形|方块|方形|正方形)$`).test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(矩形|长方形|方块|方形|正方形)$`).test(text) || /^(画方块|画矩形|来个方块)$/.test(text)) {
     const label = `${color.label || ''}矩形`
     return commandResult(`创建${label}`, [
       {
@@ -275,7 +351,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (new RegExp(`^(画|来一条|创建|生成|加一条).*(线|直线)$`).test(text) || /^画线$/.test(text)) {
+  if (new RegExp(`^(画|画一条|来一条|创建|生成|加一条|弄一条).*(线|直线|线条)$`).test(text) || /^(画线|来条线)$/.test(text)) {
     return commandResult('创建线条', [
       {
         action: 'create',
@@ -293,7 +369,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (new RegExp(`^${shapePrefix}.*(星星|五角星)$`).test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(星星|五角星)$`).test(text) || /^(画星星|来个星星)$/.test(text)) {
     return commandResult('创建星星', [
       {
         action: 'create',

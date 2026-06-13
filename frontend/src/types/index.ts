@@ -6,6 +6,7 @@ export interface DrawCommand {
     | 'move'
     | 'moveBy'
     | 'scale'
+    | 'select'
     | 'delete'
     | 'clear'
     | 'undo'
