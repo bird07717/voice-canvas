@@ -48,38 +48,38 @@ export default function Login() {
             <svg className="preview-drawing" viewBox="0 0 520 330">
               <path
                 className="preview-curve"
-                d="M56 235C116 170 162 260 222 196S333 120 430 178"
+                d="M52 238C112 178 160 258 226 202S340 142 456 198"
               />
               <rect
                 className="preview-shape preview-rect"
-                x="76"
+                x="72"
                 y="88"
-                width="110"
-                height="76"
+                width="104"
+                height="72"
                 rx="16"
               />
               <circle
                 className="preview-shape preview-circle"
-                cx="346"
-                cy="130"
-                r="55"
+                cx="382"
+                cy="132"
+                r="50"
               />
               <path
                 className="preview-shape preview-star"
-                d="M260 74l16 35 38 4-28 26 8 37-34-19-34 19 8-37-28-26 38-4 16-35Z"
+                d="M246 80l14 31 34 4-25 23 7 34-30-17-30 17 7-34-25-23 34-4 14-31Z"
               />
               <rect
                 className="preview-selection"
-                x="291"
-                y="75"
-                width="110"
-                height="110"
+                x="332"
+                y="82"
+                width="100"
+                height="100"
                 rx="8"
               />
-              <circle className="preview-handle" cx="291" cy="75" r="5" />
-              <circle className="preview-handle" cx="401" cy="75" r="5" />
-              <circle className="preview-handle" cx="401" cy="185" r="5" />
-              <circle className="preview-handle" cx="291" cy="185" r="5" />
+              <circle className="preview-handle" cx="332" cy="82" r="5" />
+              <circle className="preview-handle" cx="432" cy="82" r="5" />
+              <circle className="preview-handle" cx="432" cy="182" r="5" />
+              <circle className="preview-handle" cx="332" cy="182" r="5" />
             </svg>
             <div className="preview-command">画一个红色圆</div>
             <div className="preview-wave">
