@@ -56,6 +56,22 @@ export default function ChatPanel() {
     })
   }
 
+  const getCommandCount = (commandJson: any) =>
+    commandJson?.commands?.length || 0
+
+  const getSceneTitle = (commandJson: any) =>
+    commandJson?.scene?.title || commandJson?.scene?.scene_title || ''
+
+  const getSceneDebugSummary = (commandJson: any) => {
+    if (!import.meta.env.DEV || !commandJson?.scene) return null
+
+    return {
+      scene: commandJson.scene,
+      command_count: getCommandCount(commandJson),
+      reason: commandJson.reason,
+    }
+  }
+
   return (
     <div className={`chat-panel ${collapsed ? 'chat-panel-collapsed' : ''}`}>
       <div className="chat-header">
@@ -84,9 +100,24 @@ export default function ChatPanel() {
               <div className="chat-message-content">
                 {msg.content}
                 {msg.command_json && (
-                  <div className="chat-command">
-                    执行了 {msg.command_json.commands?.length || 0} 个命令
-                  </div>
+                  <>
+                    <div className="chat-command">
+                      执行了 {getCommandCount(msg.command_json)} 个命令
+                    </div>
+                    {getSceneTitle(msg.command_json) && (
+                      <div className="chat-command">
+                        场景：{getSceneTitle(msg.command_json)}
+                      </div>
+                    )}
+                    {getSceneDebugSummary(msg.command_json) && (
+                      <details className="chat-command">
+                        <summary>Scene Plan</summary>
+                        <pre style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0' }}>
+                          {JSON.stringify(getSceneDebugSummary(msg.command_json), null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </>
                 )}
               </div>
               <div className="chat-time">{formatTime(msg.created_at)}</div>

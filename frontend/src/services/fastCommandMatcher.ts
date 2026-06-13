@@ -98,22 +98,69 @@ const KIND_ALIASES: Array<[RegExp, string[], string]> = [
   [/花/, ['flower'], '花'],
   [/人|小人/, ['person'], '小人'],
   [/车|汽车/, ['car'], '汽车'],
+  [/山|山峰/, ['mountain'], '山'],
+  [/草|草地/, ['grass'], '草地'],
+  [/路|道路|小路/, ['road'], '道路'],
+  [/河|河流|海|海面/, ['river'], '河流'],
 ]
+
+const getTargetDirection = (text: string) => {
+  if (/左边|最左|左侧/.test(text)) return 'left'
+  if (/右边|最右|右侧/.test(text)) return 'right'
+  if (/上边|最上|上面|顶部/.test(text)) return 'top'
+  if (/下边|最下|下面|底部/.test(text)) return 'bottom'
+  if (/中间|中央|中心/.test(text)) return 'center'
+  return null
+}
 
 const findTargetByKind = (text: string, context: CanvasCommandContext) => {
   const alias = KIND_ALIASES.find(([pattern]) => pattern.test(text))
   if (!alias) return null
 
-  const [, kinds] = alias
-  const matched = [...context.objects]
-    .reverse()
-    .find((obj) => {
+  const [, kinds, label] = alias
+  const matchedObjects = context.objects.filter((obj) => {
       const type = String(obj.type || '').toLowerCase()
       const kind = String(obj.kind || '').toLowerCase()
-      return kinds.includes(type) || kinds.includes(kind)
+      const kindLabel = String(obj.kindLabel || '')
+      return kinds.includes(type) || kinds.includes(kind) || kindLabel.includes(label)
     })
 
+  if (!matchedObjects.length) return null
+
+  const direction = getTargetDirection(text)
+  const matched = pickObjectByDirection(matchedObjects, direction)
   return matched?.id || null
+}
+
+const pickObjectByDirection = (
+  objects: CanvasCommandContext['objects'],
+  direction: string | null
+) => {
+  if (!direction) return [...objects].reverse()[0]
+
+  const withPosition = objects.filter(
+    (obj) => typeof obj.x === 'number' && typeof obj.y === 'number'
+  )
+  const candidates = withPosition.length ? withPosition : objects
+
+  if (direction === 'left') {
+    return [...candidates].sort((a, b) => (a.x ?? 0) - (b.x ?? 0))[0]
+  }
+  if (direction === 'right') {
+    return [...candidates].sort((a, b) => (b.x ?? 0) - (a.x ?? 0))[0]
+  }
+  if (direction === 'top') {
+    return [...candidates].sort((a, b) => (a.y ?? 0) - (b.y ?? 0))[0]
+  }
+  if (direction === 'bottom') {
+    return [...candidates].sort((a, b) => (b.y ?? 0) - (a.y ?? 0))[0]
+  }
+
+  return [...candidates].sort((a, b) => {
+    const aDistance = Math.abs((a.x ?? 400) - 400) + Math.abs((a.y ?? 300) - 300)
+    const bDistance = Math.abs((b.x ?? 400) - 400) + Math.abs((b.y ?? 300) - 300)
+    return aDistance - bDistance
+  })[0]
 }
 
 const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>
@@ -213,7 +260,7 @@ export function matchFastCommand(
 
   const target = resolveSpokenTarget(text, context)
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
+  if (/(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -235,7 +282,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|放|弄)?(大|大一点|大一些)|^放大(它|这个|选中)?$|^(大一点|再大一点)$/.test(text)) {
+  if (/(变大|放大|弄大|大一点|大一些|再大一点)/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -249,7 +296,7 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|缩|弄)?(小|小一点|小一些)|^缩小(它|这个|选中)?$|^(小一点|再小一点)$/.test(text)) {
+  if (/(变小|缩小|弄小|小一点|小一些|再小一点)/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -304,6 +351,27 @@ export function matchFastCommand(
 
     return commandResult(cornerMatch[1], [
       { action: 'move', target, params: { x: cornerMatch[2], y: cornerMatch[3] } },
+    ] as DrawCommand[])
+  }
+
+  const sideMap: Array<[RegExp, string, number, number]> = [
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(左边|左侧)$/, '移动到左边', 130, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(右边|右侧)$/, '移动到右边', 670, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(上面|顶部)$/, '移动到上方', 400, 100],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(下面|底部)$/, '移动到底部', 400, 500],
+  ]
+  const sideMatch = sideMap.find(([pattern]) => pattern.test(text))
+  if (sideMatch) {
+    if (!target) {
+      return {
+        matched: true,
+        interpretation: sideMatch[1],
+        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+      }
+    }
+
+    return commandResult(sideMatch[1], [
+      { action: 'move', target, params: { x: sideMatch[2], y: sideMatch[3] } },
     ] as DrawCommand[])
   }
 

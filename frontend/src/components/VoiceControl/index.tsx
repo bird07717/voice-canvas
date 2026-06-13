@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Space, message, Tag } from 'antd'
-import { AudioOutlined, AudioMutedOutlined, ReloadOutlined } from '@ant-design/icons'
+import { AudioOutlined, AudioMutedOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
 import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
@@ -19,6 +19,14 @@ type CommandExecutionResult = {
   success: boolean
   message: string
 }
+
+type CommandExecutionOptions = {
+  deferHistory?: boolean
+}
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const {
@@ -50,6 +58,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     undo,
     redo,
     recordCommands,
+    saveToHistory,
     setSelectedObjectId,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
@@ -213,7 +222,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus('thinking')
     setLastCommandSource('llm')
     setInterpretedText('复杂绘图或编辑命令，交给 AI 继续理解。')
-    setExecutionMessage('AI 正在根据你的指令生成绘图步骤...')
+    setExecutionMessage('AI 正在规划完整场景...')
     setIsProcessing(true)
 
     try {
@@ -245,7 +254,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
       setStatus('drawing')
       if (response.commands.length > 0) {
-        const result = executeCommands(response.commands)
+        const result = response.scene
+          ? await executeSceneCommands(response.commands)
+          : executeCommands(response.commands)
         if (!result.success) {
           setStatus('error')
           setErrorMessage(result.message)
@@ -255,16 +266,43 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         recordCommands(response.commands)
       }
       if (response.response) {
-        setInterpretedText(response.response)
+        setInterpretedText(response.scene ? `理解为：${response.scene.title}场景` : response.response)
       }
       setStatus('done')
-      setExecutionMessage(response.response || '已完成')
+      setExecutionMessage(
+        response.scene
+          ? `执行状态：已生成 ${response.scene.object_count || response.commands.length} 个对象`
+          : response.response || '已完成'
+      )
     } catch (error: any) {
       setStatus('error')
       setErrorMessage(error.response?.data?.detail || '处理命令失败')
       setExecutionMessage('')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const executeSceneCommands = async (commands: DrawCommand[]): Promise<CommandExecutionResult> => {
+    let successCount = 0
+
+    for (const [index, command] of commands.entries()) {
+      setExecutionMessage(`正在绘制场景：${index + 1} / ${commands.length}`)
+      await wait(120)
+      const result = executeCommands([command], { deferHistory: true })
+      if (!result.success) {
+        return result
+      }
+      successCount += 1
+    }
+
+    saveToHistory()
+
+    return {
+      success: successCount > 0,
+      message: successCount > 0
+        ? `已完成：执行 ${successCount} 个命令`
+        : '没有可执行的场景命令',
     }
   }
 
@@ -314,6 +352,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       id: obj.id,
       type: obj.type,
       kind: obj.params?.kind,
+      kindLabel: obj.params?.kindLabel,
       text: obj.params?.text,
       x: obj.params?.x ?? bounds?.x,
       y: obj.params?.y ?? bounds?.y,
@@ -413,7 +452,10 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     }
   }
 
-  const executeCommands = (commands: DrawCommand[]): CommandExecutionResult => {
+  const executeCommands = (
+    commands: DrawCommand[],
+    options: CommandExecutionOptions = {}
+  ): CommandExecutionResult => {
     let lastCreatedId: string | null = null
     let executedCount = 0
 
@@ -427,7 +469,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
               type: cmd.type,
               params: cmd.params || {},
               children: cmd.children,
-            })
+            }, { deferHistory: options.deferHistory })
             executedCount += 1
           }
           break
@@ -729,6 +771,19 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         >
           取消/重说
         </Button>
+
+        <Space wrap size={[8, 8]}>
+          {SCENE_SHORTCUTS.map((scene) => (
+            <Button
+              key={scene}
+              icon={<PictureOutlined />}
+              size="small"
+              onClick={() => handleVoiceCommand(`画一个${scene}`)}
+            >
+              {scene}
+            </Button>
+          ))}
+        </Space>
 
         <div className="voice-feedback-panel">
           <div className="voice-feedback-row">

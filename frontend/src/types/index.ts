@@ -47,6 +47,11 @@ export interface CanvasData {
   canvas_json: {
     objects: CanvasObject[]
     version: string
+    scene_meta?: {
+      last_scene_type?: string
+      title?: string
+      style?: string
+    }
   }
   thumbnail_url?: string
   created_at: string
@@ -58,6 +63,7 @@ export interface CanvasContextObject {
   id: string
   type: string
   kind?: string
+  kindLabel?: string
   text?: string
   x?: number
   y?: number
@@ -96,6 +102,13 @@ export interface VoiceCommandResponse {
   commands: DrawCommand[]
   response: string
   reason?: string
+  scene?: {
+    scene_type: string
+    title: string
+    style: string
+    object_count: number
+    layout_notes?: string | null
+  }
   chat_history: ChatMessage[]
 }
 

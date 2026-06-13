@@ -1,0 +1,192 @@
+import json
+from typing import Any, Dict, Optional
+
+from openai import AsyncOpenAI
+from pydantic import ValidationError
+
+from app.models.llm_config import LLMConfig
+from app.scene.schemas import ScenePlan
+from app.scene.templates import apply_scene_template
+
+
+class ScenePlanningError(Exception):
+    def __init__(self, message: str, reason: str):
+        super().__init__(message)
+        self.message = message
+        self.reason = reason
+
+
+class ScenePlanner:
+    SYSTEM_PROMPT = """你是语音绘画系统的场景规划器。
+你的任务是把用户的一句话绘画需求拆成语义化场景计划。
+不要输出底层 Konva 参数。
+只输出严格 JSON，不要 Markdown，不要代码块。
+画布大小为 800x600。
+对象数量控制在 5-12 个。
+对象要有合理布局和层级。
+
+输出 JSON 必须符合这个结构：
+{
+  "scene_type": "英文场景类型，如 beach_sunset/park/birthday_card/city_night",
+  "title": "中文场景标题",
+  "style": "cartoon_flat",
+  "background": {
+    "fill": "背景颜色，可选",
+    "horizon_y": 330,
+    "ground_fill": "地面颜色，可选"
+  },
+  "objects": [
+    {
+      "id_hint": "可选的语义id",
+      "kind": "sun/tree/cloud/house/flower/person/car/mountain/grass/road/river/circle/rect/line/text/star 等",
+      "role": "background|midground|foreground|decoration|label",
+      "position": {
+        "anchor": "center|top|bottom|left|right|top_left|top_right|bottom_left|bottom_right|custom",
+        "x": 400,
+        "y": 300,
+        "layer": 1
+      },
+      "size": {
+        "preset": "tiny|small|medium|large|huge|wide|tall",
+        "width": 120,
+        "height": 80
+      },
+      "style": {
+        "fill": "#F97316",
+        "stroke": "#000000",
+        "opacity": 1,
+        "text": "文字内容"
+      },
+      "label": "中文对象名",
+      "description": "简短视觉描述"
+    }
+  ],
+  "layout_notes": "简短说明布局",
+  "response": "给用户的简短中文回复"
+}
+
+规则：
+- 必须返回单个 JSON object。
+- 不要创建少于 5 个对象，除非用户明确要求极简。
+- 不要创建超过 12 个对象。
+- 只输出语义化对象，不要输出 Konva shape 参数或 children。
+- 默认 style 使用 cartoon_flat。
+- position.anchor 优先使用语义锚点，只有精确布局需要 custom x/y。
+- background 和远景对象 layer 较小，前景对象 layer 较大。
+- 如果用户要求贺卡或海报，文字对象 kind 使用 text，style.text 填入文字。
+"""
+
+    EXAMPLE = {
+        "scene_type": "beach_sunset",
+        "title": "海边日落",
+        "style": "cartoon_flat",
+        "background": {
+            "fill": "#FDE68A",
+            "horizon_y": 330,
+            "ground_fill": "#F6C453",
+        },
+        "objects": [
+            {
+                "kind": "sun",
+                "role": "background",
+                "position": {"anchor": "top_right", "layer": 1},
+                "size": {"preset": "large"},
+                "style": {"fill": "#F97316"},
+                "label": "太阳",
+            },
+            {
+                "kind": "river",
+                "role": "midground",
+                "position": {"anchor": "center", "layer": 2},
+                "size": {"preset": "wide"},
+                "style": {"fill": "#38BDF8"},
+                "label": "海面",
+            },
+        ],
+        "layout_notes": "太阳在右上角，海面在中部，沙滩在底部。",
+        "response": "好的，我规划了一个海边日落场景。",
+    }
+
+    def _extract_json(self, content: str) -> Dict[str, Any]:
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            start = content.find("{")
+            end = content.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise
+            return json.loads(content[start:end + 1])
+
+    def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:
+        if not canvas_context:
+            return "当前画布上下文：无。"
+
+        objects = canvas_context.get("objects") or []
+        object_count = len(objects)
+        selected = canvas_context.get("selectedObjectId")
+        recent = [
+            {
+                "id": obj.get("id"),
+                "type": obj.get("type"),
+                "kind": obj.get("kind"),
+                "x": obj.get("x"),
+                "y": obj.get("y"),
+            }
+            for obj in objects[-10:]
+        ]
+
+        return "\n".join([
+            "当前画布上下文：",
+            f"对象数量={object_count}",
+            f"selectedObjectId={selected}",
+            f"最近对象={json.dumps(recent, ensure_ascii=False)}",
+        ])
+
+    async def plan(
+        self,
+        text: str,
+        canvas_context: Optional[Dict[str, Any]],
+        llm_config: LLMConfig,
+    ) -> ScenePlan:
+        client = AsyncOpenAI(
+            api_key=llm_config.api_key,
+            base_url=llm_config.base_url,
+        )
+
+        response = await client.chat.completions.create(
+            model=llm_config.model_name,
+            messages=[
+                {"role": "system", "content": self.SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": f"参考输出示例：{json.dumps(self.EXAMPLE, ensure_ascii=False)}",
+                },
+                {"role": "system", "content": self._format_canvas_context(canvas_context)},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.4,
+            max_tokens=2500,
+        )
+
+        content = response.choices[0].message.content or ""
+        try:
+            result = self._extract_json(content)
+            plan = ScenePlan.model_validate(result)
+        except json.JSONDecodeError as exc:
+            raise ScenePlanningError(
+                "我没能可靠规划这个场景，请换一种说法再试一次。",
+                "Scene Planner 返回内容不是有效 JSON",
+            ) from exc
+        except ValidationError as exc:
+            raise ScenePlanningError(
+                "我规划出的场景结构不完整，请再描述一次你想画的场景。",
+                "ScenePlan Pydantic 校验失败",
+            ) from exc
+
+        if not plan.objects:
+            raise ScenePlanningError(
+                "我没有规划出可绘制的场景对象，请再说得具体一点。",
+                "ScenePlan objects 为空",
+            )
+
+        return apply_scene_template(plan)

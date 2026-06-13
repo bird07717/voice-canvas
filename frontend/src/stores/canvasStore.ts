@@ -20,6 +20,10 @@ type TransformOptions = {
   originY: number
 }
 
+type AddObjectOptions = {
+  deferHistory?: boolean
+}
+
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value)
 
@@ -352,7 +356,7 @@ interface CanvasState {
   setCanvasObjects: (objects: any[]) => void
   setSelectedObjectId: (id: string | null) => void
   recordCommands: (commands: any[]) => void
-  addObject: (object: any) => void
+  addObject: (object: any, options?: AddObjectOptions) => void
   updateObject: (id: string, updates: any) => void
   removeObject: (id: string) => void
   clearCanvas: () => void
@@ -386,14 +390,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       recentCommands: [...state.recentCommands, ...commands].slice(-20),
     })),
 
-  addObject: (object) => {
+  addObject: (object, options) => {
     set((state) => ({
       canvasObjects: [...state.canvasObjects, object],
       lastCreatedObjectId: object.id,
       lastModifiedObjectId: object.id,
       selectedObjectId: object.id,
     }))
-    get().saveToHistory()
+    if (!options?.deferHistory) {
+      get().saveToHistory()
+    }
   },
 
   updateObject: (id, updates) => {

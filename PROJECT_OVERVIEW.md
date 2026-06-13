@@ -4,8 +4,8 @@
 
 Voice Canvas 是一个创新的 AI 语音控制绘画 Web 应用。通过语音命令，配合大语言模型的理解能力，用户可以在画布上自由创作各种图形和艺术作品。
 
-**项目状态**：✅ 100% 完成  
-**最新更新**：2026-06-13 架构优化完成  
+**项目状态**：✅ 第二阶段 Scene Planner 完成  
+**最新更新**：2026-06-14 场景级语音创作完成  
 **项目位置**：`/home/bird/Projects/Voice_canvas`
 
 ---
@@ -58,6 +58,8 @@ cd /home/bird/Projects/Voice_canvas
 - "画一个红色的圆"
 - "画一个房子"
 - "把它变成绿色"
+- "画一个海边日落"
+- "画一张生日贺卡"
 
 ---
 
@@ -73,10 +75,13 @@ cd /home/bird/Projects/Voice_canvas
 - **自然语言**：用自然语言描述图形
 - **智能解析**：自动生成绘图命令
 - **快速命令优先**：高频创建、编辑、控制命令本地即时执行，复杂命令再进入LLM
+- **Scene Planner**：场景级请求会生成 ScenePlan，再转换为多个 Canvas commands
 
 ### 🎨 强大绘图
 - **基础图形**：圆、矩形、线条、文字、星形
 - **组合图形**：房子、树、动物
+- **完整场景**：海边日落、公园、生日贺卡、城市夜景、森林小屋、山水风景、教室
+- **渐进绘制**：场景对象按顺序出现，状态栏显示绘制进度
 - **灵活控制**：颜色、位置、大小
 - **多模态微调**：对象创建后自动选中，支持点击选中、拖拽回写和继续语音编辑
 
@@ -84,6 +89,7 @@ cd /home/bird/Projects/Voice_canvas
 - **画布管理**：创建、保存、删除
 - **历史记录**：对话历史、画布历史
 - **撤销重做**：多步撤销
+- **场景级撤销**：完整场景作为一个历史步骤回退
 - **导出功能**：PNG图片导出
 
 ---
@@ -112,6 +118,7 @@ Docker + Docker Compose
 - **前端组件**：10+ 个
 - **数据库表**：4 个
 - **文档**：8 份
+- **场景模板**：7 个
 
 ---
 
@@ -121,6 +128,7 @@ Docker + Docker Compose
 Voice_canvas/
 ├── frontend/          React前端应用
 ├── backend/           Python后端API
+│   └── app/scene      Scene Planner、模板和执行器
 ├── docs/             完整文档
 ├── README.md         项目说明
 ├── QUICKSTART.md     快速启动
@@ -148,6 +156,7 @@ Voice_canvas/
 - **docs/development.md** - 开发指南
 - **docs/api.md** - API接口文档
 - **docs/architecture.md** - 架构设计文档
+- **docs/scene_planner.md** - Scene Planner 技术文档
 
 ---
 
@@ -174,6 +183,9 @@ Voice_canvas/
 
 **AI绘图**
 - LLM智能理解
+- Scene Planner 场景生成
+- 场景模板融合和布局避让
+- 场景渐进绘制和场景级撤销
 - 前端快速命令匹配
 - 多模型支持
 - 实时Canvas渲染
@@ -198,7 +210,15 @@ Voice_canvas/
 - 语音面板固定展示当前状态、识别文本、理解结果、执行结果和错误信息。
 - 新建或修改对象会自动选中，画布对象可点击选中、拖拽移动，语音里的“它”优先指向选中对象。
 
-下一阶段建议继续推进 Scene Planner、场景级语音创作、对象关系和布局理解、tldraw Spike 以及视觉模型实验。
+## 🧭 第二阶段 Scene Planner
+
+第二阶段已将 Voice Canvas 从“语音控制单个图形”升级为“语音生成完整场景”：
+
+- 场景级请求由后端 `ScenePlanner` 生成语义化 `ScenePlan`。
+- 常见场景命中内置模板，保证海边日落、公园、生日贺卡、城市夜景等 Demo 稳定。
+- `SceneExecutor` 将 ScenePlan 转换成现有 Canvas commands，前端渐进绘制。
+- 生成后的对象保留 `kindLabel`、`sceneType`、`sceneTitle` 等元数据，可继续语音选择和编辑。
+- 场景生成保存为单个历史步骤，撤销时可整体回退。
 
 ---
 
