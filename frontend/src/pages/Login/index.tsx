@@ -56,69 +56,69 @@ export default function Login() {
             <svg className="preview-drawing" viewBox="0 0 520 330">
               <path
                 className="preview-sky-line"
-                d="M72 236C138 214 196 222 258 238S384 256 456 230"
+                d="M70 260C140 238 216 242 286 260S398 282 466 248"
               />
               <circle
                 className="preview-sun"
-                cx="398"
-                cy="78"
-                r="34"
+                cx="438"
+                cy="82"
+                r="30"
               />
               <path
                 className="preview-cloud"
-                d="M112 96h74c14 0 25-10 25-23 0-12-10-22-23-22-5 0-10 1-14 4-8-14-22-22-39-22-24 0-44 19-44 42 0 8 2 15 6 21h15Z"
+                d="M82 100h78c13 0 23-9 23-21 0-11-9-20-21-20-5 0-9 1-13 4-8-13-21-20-36-20-22 0-40 17-40 38 0 7 2 14 6 19h3Z"
               />
               <path
                 className="preview-house-roof"
-                d="M176 172l70-58 70 58Z"
+                d="M144 178l66-56 66 56Z"
               />
               <rect
                 className="preview-house-wall"
-                x="194"
-                y="172"
-                width="104"
+                x="160"
+                y="178"
+                width="100"
                 height="78"
                 rx="8"
               />
               <rect
                 className="preview-door"
-                x="236"
-                y="204"
+                x="202"
+                y="211"
                 width="26"
-                height="46"
+                height="45"
                 rx="5"
               />
               <rect
                 className="preview-window"
-                x="206"
-                y="187"
+                x="174"
+                y="193"
                 width="24"
                 height="20"
                 rx="5"
               />
               <rect
                 className="preview-tree-trunk"
-                x="370"
-                y="188"
+                x="362"
+                y="197"
                 width="24"
-                height="62"
+                height="60"
                 rx="6"
               />
               <circle
                 className="preview-tree-crown"
-                cx="382"
+                cx="374"
                 cy="164"
-                r="44"
+                r="42"
               />
               <circle
                 className="preview-tree-crown preview-tree-crown-light"
-                cx="416"
-                cy="178"
-                r="30"
+                cx="411"
+                cy="176"
+                r="28"
               />
               <path
                 className="preview-brush-path"
-                d="M88 272c62-30 126-34 190-12 60 21 112 16 158-16"
+                d="M96 288c70-28 142-28 214-8 58 16 106 10 150-18"
               />
             </svg>
             <div className="preview-wave">

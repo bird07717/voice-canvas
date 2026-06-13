@@ -144,15 +144,15 @@
 
 .preview-drawing {
   position: absolute;
-  inset: 58px 32px 28px;
+  inset: 64px 32px 22px;
   width: calc(100% - 64px);
   height: calc(100% - 86px);
 }
 
 .preview-bubbles {
   position: absolute;
-  top: 28px;
-  right: 28px;
+  top: 26px;
+  right: 30px;
   z-index: 1;
   display: grid;
   gap: 10px;
@@ -177,7 +177,7 @@
 }
 
 .preview-bubble-ai {
-  margin-right: 34px;
+  margin-right: 44px;
   color: rgba(13, 42, 63, 0.86);
   background: rgba(207, 250, 254, 0.72);
 }
