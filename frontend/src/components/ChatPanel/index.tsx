@@ -62,6 +62,16 @@ export default function ChatPanel() {
   const getSceneTitle = (commandJson: any) =>
     commandJson?.scene?.title || commandJson?.scene?.scene_title || ''
 
+  const getSceneDebugSummary = (commandJson: any) => {
+    if (!import.meta.env.DEV || !commandJson?.scene) return null
+
+    return {
+      scene: commandJson.scene,
+      command_count: getCommandCount(commandJson),
+      reason: commandJson.reason,
+    }
+  }
+
   return (
     <div className={`chat-panel ${collapsed ? 'chat-panel-collapsed' : ''}`}>
       <div className="chat-header">
@@ -98,6 +108,14 @@ export default function ChatPanel() {
                       <div className="chat-command">
                         场景：{getSceneTitle(msg.command_json)}
                       </div>
+                    )}
+                    {getSceneDebugSummary(msg.command_json) && (
+                      <details className="chat-command">
+                        <summary>Scene Plan</summary>
+                        <pre style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0' }}>
+                          {JSON.stringify(getSceneDebugSummary(msg.command_json), null, 2)}
+                        </pre>
+                      </details>
                     )}
                   </>
                 )}
