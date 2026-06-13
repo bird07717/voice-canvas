@@ -3,6 +3,8 @@ from typing import Optional, List, Dict, Any
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from app.drawing.executor import DrawingExecutor
+from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
 
 
@@ -135,6 +137,113 @@ class LLMService:
 }
 """
 
+    TOOL_PLANNING_PROMPT = """你是语音绘画系统的工具调用规划器。
+
+用户会用自然中文口语表达绘画需求。你的任务不是直接生成底层Canvas图形，而是选择合适的高层工具调用。
+
+你必须只返回严格JSON，不要Markdown，不要代码块：
+{
+  "calls": [
+    {
+      "tool": "create_object|edit_object|delete_object|control_canvas|ask_clarification|ignore_input",
+      "confidence": 0.0到1.0,
+      "arguments": {}
+    }
+  ],
+  "response": "给用户的简短中文回复",
+  "reasoning": "简短说明判断原因"
+}
+
+工具说明：
+1. create_object: 创建对象
+arguments:
+{
+  "kind": "对象语义，如 circle/sun/tree/house/cloud/flower/person/car/mountain/grass/road/river/dragon",
+  "render_strategy": "basic|template|svg",
+  "position": {"anchor": "center|top|bottom|left|right|top_left|top_right|bottom_left|bottom_right|near_target|custom", "x": 数字, "y": 数字},
+  "size": {"preset": "tiny|small|medium|large|huge"},
+  "style": {"fill": "颜色", "stroke": "颜色", "text": "文字"},
+  "description": "未知对象或复杂图形的详细视觉描述"
+}
+
+2. edit_object: 修改对象
+arguments:
+{
+  "target": {"ref": "last|selected|kind|id", "kind": "对象类型", "id": "对象id"},
+  "changes": {"fill": "颜色", "x": 数字, "y": 数字, "scale": 数字, "rotation": 数字}
+}
+
+3. delete_object: 删除对象
+arguments: {"target": {"ref": "last|selected|kind|id", "kind": "对象类型", "id": "对象id"}}
+
+4. control_canvas: 画布控制
+arguments: {"action": "undo|redo|clear|save|export"}
+
+5. ask_clarification: 缺少关键信息时追问
+arguments: {"question": "追问内容", "missing": ["缺少的信息"]}
+
+6. ignore_input: 背景噪声、闲聊、和绘画无关
+arguments: {"reason": "忽略原因"}
+
+策略：
+- 常见对象使用 template：sun/tree/cloud/house/flower/person/car/mountain/grass/road/river。
+- 基础图形使用 basic：circle/rectangle/square/line/text/star/polygon。
+- 模板库没有的对象使用 svg，例如恐龙、飞船、猫头鹰、小提琴。
+- 只要用户有明确绘画对象、颜色、位置或编辑动作，就尽量调用工具，不要轻易 ignore。
+- 只有完全无关的话才 ignore。
+- “它”“刚才那个”“这个”默认 target.ref = "last"。
+- “清空”“撤销”“重做”使用 control_canvas。
+
+示例：
+用户：“在右上角画一个黄色太阳”
+{
+  "calls": [
+    {
+      "tool": "create_object",
+      "confidence": 0.95,
+      "arguments": {
+        "kind": "sun",
+        "render_strategy": "template",
+        "position": {"anchor": "top_right"},
+        "size": {"preset": "medium"},
+        "style": {"fill": "yellow"}
+      }
+    }
+  ],
+  "response": "好的，我在右上角画了一个太阳。",
+  "reasoning": "明确的模板对象创建请求"
+}
+
+用户：“把它变成蓝色”
+{
+  "calls": [
+    {
+      "tool": "edit_object",
+      "confidence": 0.82,
+      "arguments": {
+        "target": {"ref": "last"},
+        "changes": {"fill": "blue"}
+      }
+    }
+  ],
+  "response": "好的，我把刚才的对象改成蓝色。",
+  "reasoning": "编辑最近对象"
+}
+
+用户：“今天晚上吃什么”
+{
+  "calls": [
+    {
+      "tool": "ignore_input",
+      "confidence": 0.98,
+      "arguments": {"reason": "闲聊内容，与绘画无关"}
+    }
+  ],
+  "response": "",
+  "reasoning": "非绘画语音"
+}
+"""
+
     def __init__(self, db: Optional[AsyncSession]):
         self.db = db
 
@@ -194,6 +303,11 @@ class LLMService:
             "reason": reason
         }
 
+    def _execute_tool_plan(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        plan = parse_drawing_plan(result)
+        executed = DrawingExecutor().execute(plan)
+        return self._normalize_llm_result(executed)
+
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
         """获取用户的激活LLM配置"""
         if not self.db:
@@ -244,7 +358,7 @@ class LLMService:
             response = await client.chat.completions.create(
                 model=config.model_name,
                 messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "system", "content": self.TOOL_PLANNING_PROMPT},
                     {"role": "user", "content": text}
                 ],
                 temperature=0.7,
@@ -256,8 +370,10 @@ class LLMService:
             # 解析并规范化JSON响应
             try:
                 result = self._extract_json(content or "")
+                if "calls" in result:
+                    return self._execute_tool_plan(result)
                 return self._normalize_llm_result(result)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ToolParseError):
                 # 无法解析时默认追问，避免误操作画布
                 return {
                     "intent": "clarify",
