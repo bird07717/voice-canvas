@@ -36,6 +36,65 @@
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
 }
 
+.voice-feedback-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  border-radius: 10px;
+}
+
+.voice-feedback-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.voice-feedback-label {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.voice-feedback-value {
+  min-width: 0;
+  color: #172033;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.voice-feedback-value.status-listening,
+.voice-feedback-value.status-recognizing,
+.voice-feedback-value.status-matched,
+.voice-feedback-value.status-thinking,
+.voice-feedback-value.status-drawing {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.voice-feedback-value.status-done {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.voice-feedback-value.status-error {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.voice-error-box {
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .recognized-text-box {
   padding: 12px;
   border: 1px solid #dbeafe;

@@ -1,21 +1,43 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Space, message, Tag } from 'antd'
-import { AudioOutlined, AudioMutedOutlined } from '@ant-design/icons'
+import { AudioOutlined, AudioMutedOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
 import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
+import { matchFastCommand } from '@/services/fastCommandMatcher'
 import { CanvasCommandContext, CanvasObject, DrawCommand } from '@/types'
 import './VoiceControl.css'
 
-export default function VoiceControl() {
+type VoiceControlProps = {
+  onSave?: () => Promise<boolean> | boolean
+  onExport?: () => Promise<boolean> | boolean
+}
+
+type CommandExecutionResult = {
+  success: boolean
+  message: string
+}
+
+export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const {
+    isListening,
     status,
     recognizedText,
+    interpretedText,
+    executionMessage,
+    errorMessage,
+    lastCommandSource,
     recognitionType,
     baiduConfig,
+    setIsListening,
     setRecognizedText,
+    setInterpretedText,
+    setExecutionMessage,
+    setErrorMessage,
+    setLastCommandSource,
+    resetVoiceFeedback,
     setStatus,
     setRecognitionType
   } = useVoiceStore()
@@ -26,6 +48,7 @@ export default function VoiceControl() {
     removeObject,
     clearCanvas,
     undo,
+    redo,
     recordCommands,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
@@ -45,18 +68,18 @@ export default function VoiceControl() {
   }, [baiduConfig, setRecognitionType])
 
   const handleStartVoice = async () => {
-    if (!activeConfig) {
-      message.warning('请先在首页设置中配置LLM模型')
-      return
-    }
-
     if (!voiceService.isSupported()) {
+      setStatus('error')
+      setErrorMessage('您的浏览器不支持语音识别')
       message.error('您的浏览器不支持语音识别')
       return
     }
 
     setIsStarting(true)
+    setIsListening(true)
     setStatus('listening')
+    setExecutionMessage('正在听...')
+    setErrorMessage('')
 
     try {
       // 初始化语音服务（带百度配置）
@@ -70,6 +93,9 @@ export default function VoiceControl() {
       await voiceService.startListening(
         (text, isFinal) => {
           setRecognizedText(text)
+          setErrorMessage('')
+          setStatus(isFinal ? 'thinking' : 'recognizing')
+          setExecutionMessage(isFinal ? '正在理解...' : '正在识别...')
           if (isFinal) {
             const normalizedText = text.trim()
             const now = Date.now()
@@ -85,14 +111,22 @@ export default function VoiceControl() {
         },
         (error) => {
           console.error('语音识别错误:', error)
-          message.error('语音识别出错: ' + (error.message || error))
-          setStatus('idle')
+          const nextError = '语音识别出错: ' + (error.message || error)
+          setErrorMessage(nextError)
+          setExecutionMessage('')
+          setStatus('error')
+          setIsListening(false)
+          message.error(nextError)
         }
       )
       setRecognitionType(voiceService.getRecognitionType())
     } catch (error: any) {
-      message.error('启动语音识别失败: ' + (error.message || error))
-      setStatus('idle')
+      const nextError = '启动语音识别失败: ' + (error.message || error)
+      setErrorMessage(nextError)
+      setExecutionMessage('')
+      setStatus('error')
+      setIsListening(false)
+      message.error(nextError)
     } finally {
       setIsStarting(false)
     }
@@ -100,6 +134,15 @@ export default function VoiceControl() {
 
   const handleStopVoice = () => {
     voiceService.stopListening()
+    setIsListening(false)
+    setStatus('idle')
+    setExecutionMessage('')
+  }
+
+  const handleResetVoice = () => {
+    voiceService.stopListening()
+    setIsListening(false)
+    resetVoiceFeedback()
     setStatus('idle')
   }
 
@@ -107,7 +150,67 @@ export default function VoiceControl() {
     const canvasState = useCanvasStore.getState()
     if (!canvasState.currentCanvasId || !text.trim()) return
 
-    setStatus('processing')
+    const canvasContext = buildCanvasContext()
+    const fastCommand = matchFastCommand(text, canvasContext)
+
+    if (fastCommand.matched) {
+      setLastCommandSource('fast')
+      setInterpretedText(fastCommand.interpretation || '')
+
+      if (fastCommand.errorMessage) {
+        setStatus('error')
+        setErrorMessage(fastCommand.errorMessage)
+        setExecutionMessage('')
+        return
+      }
+
+      setStatus('matched')
+      setExecutionMessage(fastCommand.message || '快速匹配成功')
+
+      try {
+        if (fastCommand.controlAction) {
+          const completed = await executeControlAction(fastCommand.controlAction)
+          if (!completed) return
+          setStatus('done')
+          setExecutionMessage(fastCommand.message || '已完成')
+          return
+        }
+
+        if (fastCommand.commands?.length) {
+          setStatus('drawing')
+          const result = executeCommands(fastCommand.commands)
+          if (!result.success) {
+            setStatus('error')
+            setErrorMessage(result.message)
+            setExecutionMessage('')
+            return
+          }
+          recordCommands(fastCommand.commands)
+          setStatus('done')
+          setExecutionMessage(result.message || fastCommand.message || '已完成')
+          return
+        }
+      } catch (error: any) {
+        setStatus('error')
+        setErrorMessage(error.message || '快速命令执行失败')
+        setExecutionMessage('')
+        return
+      }
+    }
+
+    if (!activeConfig) {
+      setStatus('error')
+      setLastCommandSource(null)
+      setInterpretedText('需要 AI 理解的复杂命令')
+      setErrorMessage('未配置LLM模型，复杂命令暂时无法理解。请先在首页设置中配置LLM。')
+      setExecutionMessage('')
+      return
+    }
+
+    setStatus('thinking')
+    setLastCommandSource('llm')
+    setInterpretedText('正在生成复杂图形...')
+    setExecutionMessage(fastCommand.message || '这个命令我还不会，我会交给 AI 理解。')
     setIsProcessing(true)
 
     try {
@@ -115,10 +218,12 @@ export default function VoiceControl() {
         canvas_id: canvasState.currentCanvasId,
         text: text.trim(),
         llm_config_id: activeConfig?.id,
-        canvas_context: buildCanvasContext(),
+        canvas_context: canvasContext,
       })
 
       if (response.intent === 'ignore') {
+        setStatus('done')
+        setExecutionMessage('已忽略无效语音')
         return
       }
 
@@ -128,23 +233,33 @@ export default function VoiceControl() {
 
       if (response.intent === 'clarify') {
         if (response.response) {
-          message.info(response.response)
+          setExecutionMessage(response.response)
         }
+        setStatus('done')
         return
       }
 
       setStatus('drawing')
       if (response.commands.length > 0) {
-        executeCommands(response.commands)
+        const result = executeCommands(response.commands)
+        if (!result.success) {
+          setStatus('error')
+          setErrorMessage(result.message)
+          setExecutionMessage('')
+          return
+        }
         recordCommands(response.commands)
       }
       if (response.response) {
-        message.success(response.response)
+        setInterpretedText(response.response)
       }
+      setStatus('done')
+      setExecutionMessage(response.response || '已完成')
     } catch (error: any) {
-      message.error(error.response?.data?.detail || '处理命令失败')
+      setStatus('error')
+      setErrorMessage(error.response?.data?.detail || '处理命令失败')
+      setExecutionMessage('')
     } finally {
-      setStatus('listening')
       setIsProcessing(false)
     }
   }
@@ -240,8 +355,36 @@ export default function VoiceControl() {
     return null
   }
 
-  const executeCommands = (commands: DrawCommand[]) => {
+  const executeControlAction = async (action: 'save' | 'export' | 'cancel' | 'continue') => {
+    switch (action) {
+      case 'save':
+        if (!onSave) throw new Error('保存失败，请稍后再试。')
+        if (!(await onSave())) throw new Error('保存失败，请稍后再试。')
+        return true
+
+      case 'export':
+        if (!onExport) throw new Error('导出失败，请确认画布已加载。')
+        if (!(await onExport())) throw new Error('导出失败，请确认画布已加载。')
+        return true
+
+      case 'cancel':
+        handleResetVoice()
+        return false
+
+      case 'continue':
+        if (!isListening) {
+          await handleStartVoice()
+        } else {
+          setStatus('listening')
+          setExecutionMessage('正在听...')
+        }
+        return false
+    }
+  }
+
+  const executeCommands = (commands: DrawCommand[]): CommandExecutionResult => {
     let lastCreatedId: string | null = null
+    let executedCount = 0
 
     commands.forEach((cmd) => {
       switch (cmd.action) {
@@ -254,6 +397,7 @@ export default function VoiceControl() {
               params: cmd.params || {},
               children: cmd.children,
             })
+            executedCount += 1
           }
           break
 
@@ -262,6 +406,7 @@ export default function VoiceControl() {
             const target = resolveCommandTarget(cmd.target, lastCreatedId)
             if (target) {
               updateObject(target, cmd.params)
+              executedCount += 1
             }
           }
           break
@@ -271,6 +416,29 @@ export default function VoiceControl() {
             const target = resolveCommandTarget(cmd.target, lastCreatedId)
             if (target) {
               updateObject(target, { x: cmd.params.x, y: cmd.params.y })
+              executedCount += 1
+            }
+          }
+          break
+
+        case 'moveBy':
+          if (cmd.target && cmd.params) {
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            const updates = target ? getMoveByUpdates(target, cmd.params.dx || 0, cmd.params.dy || 0) : null
+            if (target && updates) {
+              updateObject(target, updates)
+              executedCount += 1
+            }
+          }
+          break
+
+        case 'scale':
+          if (cmd.target && cmd.params) {
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            const updates = target ? getScaleUpdates(target, cmd.params.scale || 1) : null
+            if (target && updates) {
+              updateObject(target, updates)
+              executedCount += 1
             }
           }
           break
@@ -280,22 +448,116 @@ export default function VoiceControl() {
             const target = resolveCommandTarget(cmd.target, lastCreatedId)
             if (target) {
               removeObject(target)
+              executedCount += 1
             }
           }
           break
 
         case 'clear':
           clearCanvas()
+          executedCount += 1
           break
 
         case 'undo':
+          if (useCanvasStore.getState().historyStep <= 0) {
+            return
+          }
           undo()
+          executedCount += 1
+          break
+
+        case 'redo':
+          {
+            const state = useCanvasStore.getState()
+            if (state.historyStep >= state.history.length - 1) {
+              return
+            }
+            redo()
+            executedCount += 1
+          }
           break
 
         default:
           console.warn('未知命令:', cmd)
       }
     })
+
+    if (executedCount === 0) {
+      return {
+        success: false,
+        message: getNoOpMessage(commands),
+      }
+    }
+
+    return {
+      success: true,
+      message: `已完成：执行 ${executedCount} 个命令`,
+    }
+  }
+
+  const getNoOpMessage = (commands: DrawCommand[]) => {
+    const action = commands[0]?.action
+    if (action === 'undo') return '当前没有可撤销的操作。'
+    if (action === 'redo') return '当前没有可重做的操作。'
+    return '没有可修改的对象，请先选中或创建一个对象。'
+  }
+
+  const getMoveByUpdates = (targetId: string, dx: number, dy: number) => {
+    const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
+    if (!obj) return null
+
+    const params = obj.params || {}
+    if (Array.isArray(params.points)) {
+      return {
+        points: params.points.map((point: number, index: number) =>
+          index % 2 === 0 ? point + dx : point + dy
+        ),
+      }
+    }
+
+    return {
+      x: (params.x || 0) + dx,
+      y: (params.y || 0) + dy,
+    }
+  }
+
+  const getScaleUpdates = (targetId: string, scale: number) => {
+    const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
+    if (!obj) return null
+
+    const params = obj.params || {}
+    if (obj.type === 'circle') {
+      return { radius: Math.max(8, (params.radius || 50) * scale) }
+    }
+
+    if (obj.type === 'star') {
+      return {
+        innerRadius: Math.max(6, (params.innerRadius || 25) * scale),
+        outerRadius: Math.max(10, (params.outerRadius || 55) * scale),
+      }
+    }
+
+    if (obj.type === 'text') {
+      return { fontSize: Math.max(10, (params.fontSize || 28) * scale) }
+    }
+
+    if (Array.isArray(params.points)) {
+      const xs = params.points.filter((_: number, index: number) => index % 2 === 0)
+      const ys = params.points.filter((_: number, index: number) => index % 2 === 1)
+      const originX = (Math.min(...xs) + Math.max(...xs)) / 2
+      const originY = (Math.min(...ys) + Math.max(...ys)) / 2
+      return {
+        points: params.points.map((point: number, index: number) => {
+          const origin = index % 2 === 0 ? originX : originY
+          return origin + (point - origin) * scale
+        }),
+      }
+    }
+
+    return {
+      width: Math.max(8, (params.width || 120) * scale),
+      height: Math.max(8, (params.height || 80) * scale),
+    }
   }
 
   const resolveCommandTarget = (target: string, lastCreatedId: string | null) => {
@@ -334,6 +596,33 @@ export default function VoiceControl() {
     }
   }
 
+  const getStatusLabel = () => {
+    switch (status) {
+      case 'listening':
+        return '正在听'
+      case 'recognizing':
+        return '正在识别'
+      case 'matched':
+        return '快速匹配'
+      case 'thinking':
+        return '正在理解'
+      case 'drawing':
+        return '正在绘制'
+      case 'done':
+        return '已完成'
+      case 'error':
+        return '出错'
+      default:
+        return '空闲'
+    }
+  }
+
+  const getCommandSourceLabel = () => {
+    if (lastCommandSource === 'fast') return '本地快速命令'
+    if (lastCommandSource === 'llm') return 'AI 理解'
+    return '待识别'
+  }
+
   return (
     <div className="voice-control">
       <div className="voice-control-header">
@@ -342,7 +631,7 @@ export default function VoiceControl() {
       </div>
 
       <Space direction="vertical" style={{ width: '100%' }}>
-        {status === 'idle' ? (
+        {!isListening ? (
           <Button
             type="primary"
             icon={<AudioOutlined />}
@@ -365,12 +654,37 @@ export default function VoiceControl() {
           </Button>
         )}
 
-        {recognizedText && (
-          <div className="recognized-text-box">
-            <p className="label">识别文本：</p>
-            <p className="text">{recognizedText}</p>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={handleResetVoice}
+          block
+        >
+          取消/重说
+        </Button>
+
+        <div className="voice-feedback-panel">
+          <div className="voice-feedback-row">
+            <span className="voice-feedback-label">当前状态</span>
+            <span className={`voice-feedback-value status-${status}`}>{getStatusLabel()}</span>
           </div>
-        )}
+          <div className="voice-feedback-row">
+            <span className="voice-feedback-label">识别文本</span>
+            <span className="voice-feedback-value">{recognizedText || '等待语音输入'}</span>
+          </div>
+          <div className="voice-feedback-row">
+            <span className="voice-feedback-label">理解为</span>
+            <span className="voice-feedback-value">{interpretedText || getCommandSourceLabel()}</span>
+          </div>
+          <div className="voice-feedback-row">
+            <span className="voice-feedback-label">执行结果</span>
+            <span className="voice-feedback-value">{executionMessage || '暂无执行结果'}</span>
+          </div>
+          {errorMessage && (
+            <div className="voice-error-box">
+              {errorMessage}
+            </div>
+          )}
+        </div>
 
         <div className="voice-tips">
           <h4>实时语音命令示例：</h4>
