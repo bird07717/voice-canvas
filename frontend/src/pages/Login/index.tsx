@@ -60,26 +60,26 @@ export default function Login() {
               />
               <circle
                 className="preview-shape preview-circle"
-                cx="382"
+                cx="406"
                 cy="132"
-                r="50"
+                r="46"
               />
               <path
                 className="preview-shape preview-star"
-                d="M246 80l14 31 34 4-25 23 7 34-30-17-30 17 7-34-25-23 34-4 14-31Z"
+                d="M230 86l12 27 30 3-22 21 6 30-26-15-26 15 6-30-22-21 30-3 12-27Z"
               />
               <rect
                 className="preview-selection"
-                x="332"
-                y="82"
-                width="100"
-                height="100"
+                x="360"
+                y="86"
+                width="92"
+                height="92"
                 rx="8"
               />
-              <circle className="preview-handle" cx="332" cy="82" r="5" />
-              <circle className="preview-handle" cx="432" cy="82" r="5" />
-              <circle className="preview-handle" cx="432" cy="182" r="5" />
-              <circle className="preview-handle" cx="332" cy="182" r="5" />
+              <circle className="preview-handle" cx="360" cy="86" r="4.5" />
+              <circle className="preview-handle" cx="452" cy="86" r="4.5" />
+              <circle className="preview-handle" cx="452" cy="178" r="4.5" />
+              <circle className="preview-handle" cx="360" cy="178" r="4.5" />
             </svg>
             <div className="preview-command">画一个红色圆</div>
             <div className="preview-wave">

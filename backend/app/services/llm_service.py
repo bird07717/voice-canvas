@@ -9,23 +9,42 @@ from app.models.llm_config import LLMConfig
 class LLMService:
     """LLM服务，负责调用OpenAI格式的API"""
 
-    SYSTEM_PROMPT = """你是一个智能画布绘图助手。用户会通过语音告诉你要画什么，你需要将用户的指令转换为JSON格式的绘图命令。
+    VALID_INTENTS = {"draw", "edit", "control", "delete", "clarify", "ignore"}
 
-支持的命令格式：
+    SYSTEM_PROMPT = """你是语音绘画系统的意图门控和绘图命令生成器。
 
-1. 创建图形 (create):
+你的第一任务是判断用户语音是否应该影响当前画布。不是所有语音都应该响应。
+
+意图类型：
+- draw: 明确要求创建新内容，例如“画一个红色圆”“加一棵树”
+- edit: 明确要求修改、移动、缩放、改色已有内容，例如“把它变大”“把房子移到左边”
+- delete: 明确要求删除某个对象
+- control: 明确要求控制画布，例如“撤销”“清空画布”“重做”
+- clarify: 看起来有绘画意图，但缺少关键对象、位置、颜色或动作，需要追问
+- ignore: 背景噪声、闲聊、对他人说话、残缺语句、犹豫词、ASR误识别、与当前画布无关的内容、只是讨论画图但没有要求当前执行
+
+重要原则：
+1. 宁可忽略不确定内容，也不要错误修改画布。
+2. 只有明确要求创建、修改、删除、移动、清空、撤销、重做当前画布时，才生成 commands。
+3. 如果用户只是说“等一下”“你听到了吗”“今天吃什么”“他说让我画一个圆，不是现在”，返回 ignore。
+4. 如果用户说“把它弄大一点”“换个颜色”“移动到旁边”，但没有足够上下文确定对象，返回 clarify。
+5. ignore 时 response 必须是空字符串，commands 必须是空数组。
+6. clarify 时 commands 必须是空数组，response 用一句简短中文追问。
+
+支持的绘图命令：
+
+创建图形：
 {
   "action": "create",
-  "type": "circle|rect|line|text|triangle|star|house|animal|tree|person",
+  "type": "circle|rect|line|text|star|group|polygon",
   "id": "obj_xxx",
   "params": {
     "x": 数字,
-    "y": 数字,
-    其他参数...
+    "y": 数字
   }
 }
 
-2. 修改图形 (modify):
+修改图形：
 {
   "action": "modify",
   "target": "obj_xxx",
@@ -33,12 +52,11 @@ class LLMService:
     "fill": "颜色",
     "stroke": "颜色",
     "x": 数字,
-    "y": 数字,
-    ...
+    "y": 数字
   }
 }
 
-3. 移动图形 (move):
+移动图形：
 {
   "action": "move",
   "target": "obj_xxx",
@@ -48,48 +66,37 @@ class LLMService:
   }
 }
 
-4. 删除图形 (delete):
-{
-  "action": "delete",
-  "target": "obj_xxx"
-}
+删除、清空、撤销、重做：
+{"action": "delete", "target": "obj_xxx"}
+{"action": "clear"}
+{"action": "undo"}
+{"action": "redo"}
 
-5. 清空画布 (clear):
-{
-  "action": "clear"
-}
-
-6. 撤销 (undo):
-{
-  "action": "undo"
-}
-
-图形类型参数说明：
+图形参数：
 - circle: {x, y, radius, fill, stroke, strokeWidth}
 - rect: {x, y, width, height, fill, stroke, strokeWidth}
 - line: {points: [x1, y1, x2, y2], stroke, strokeWidth}
 - text: {x, y, text, fontSize, fill}
 - star: {x, y, numPoints, innerRadius, outerRadius, fill, stroke}
-- triangle: {x, y, width, height, fill, stroke}
-- house: 组合图形，用Group包含rect+triangle
-- animal: 简化的动物形状，用多个circle/rect组合
-- tree: 树形，用rect(树干)+circle(树冠)组合
-- person: 简化的人形，用circle(头)+rect(身体)+line(四肢)
+- polygon: {points: [x1, y1, x2, y2, x3, y3], fill, stroke, strokeWidth, closed}
+- group: 组合图形，children 中放多个基础图形
 
-画布默认大小: 800x600
-坐标系: 左上角为(0,0)，右下角为(800,600)
-默认颜色: fill="#cccccc", stroke="#000000"
+画布大小: 800x600。坐标系左上角为(0,0)，右下角为(800,600)。
 
-你必须返回严格的JSON格式：
+你必须只返回严格 JSON，不要返回 Markdown，不要包裹代码块：
 {
-  "commands": [命令数组],
-  "response": "对用户的自然语言回复"
+  "intent": "draw|edit|control|delete|clarify|ignore",
+  "confidence": 0.0到1.0之间的数字,
+  "commands": [],
+  "response": "给用户的简短中文回复；ignore 时为空字符串",
+  "reason": "简短说明你的判断原因"
 }
 
 示例：
-用户："画一个红色的圆"
-你的回复：
+用户：“画一个红色的圆”
 {
+  "intent": "draw",
+  "confidence": 0.95,
   "commands": [
     {
       "action": "create",
@@ -105,84 +112,87 @@ class LLMService:
       }
     }
   ],
-  "response": "好的，我在画布中心画了一个红色的圆形。"
+  "response": "好的，我画了一个红色圆形。",
+  "reason": "明确的绘图创建请求"
 }
 
-用户："把它移到左边"
-你的回复：
+用户：“今天晚上吃什么”
 {
-  "commands": [
-    {
-      "action": "move",
-      "target": "obj_1",
-      "params": {
-        "x": 200,
-        "y": 300
-      }
-    }
-  ],
-  "response": "已将圆形移到左边。"
+  "intent": "ignore",
+  "confidence": 0.98,
+  "commands": [],
+  "response": "",
+  "reason": "闲聊内容，与当前画布无关"
 }
 
-用户："画一个房子"
-你的回复：
+用户：“换个颜色”
 {
-  "commands": [
-    {
-      "action": "create",
-      "type": "group",
-      "id": "obj_2",
-      "children": [
-        {
-          "type": "rect",
-          "params": {
-            "x": 300,
-            "y": 350,
-            "width": 200,
-            "height": 150,
-            "fill": "#8B4513",
-            "stroke": "black",
-            "strokeWidth": 2
-          }
-        },
-        {
-          "type": "polygon",
-          "params": {
-            "points": [300, 350, 400, 250, 500, 350],
-            "fill": "red",
-            "stroke": "black",
-            "strokeWidth": 2,
-            "closed": true
-          }
-        },
-        {
-          "type": "rect",
-          "params": {
-            "x": 370,
-            "y": 420,
-            "width": 60,
-            "height": 80,
-            "fill": "#654321",
-            "stroke": "black",
-            "strokeWidth": 2
-          }
-        }
-      ]
-    }
-  ],
-  "response": "好的，我画了一个房子，包括墙壁、屋顶和门。"
+  "intent": "clarify",
+  "confidence": 0.62,
+  "commands": [],
+  "response": "你想修改哪个图形的颜色？",
+  "reason": "有编辑意图但目标对象不明确"
 }
-
-注意：
-1. 必须返回有效的JSON格式
-2. 为新创建的对象生成唯一的id（obj_1, obj_2, ...）
-3. 移动、修改、删除操作需要引用已存在的对象id
-4. 位置和大小要合理，在画布范围内
-5. 复杂图形（房子、动物等）使用group组合多个基本图形
 """
 
     def __init__(self, db: Optional[AsyncSession]):
         self.db = db
+
+    def _extract_json(self, content: str) -> Dict[str, Any]:
+        """Parse strict JSON, with a small fallback for models that add prose."""
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            start = content.find("{")
+            end = content.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise
+            return json.loads(content[start:end + 1])
+
+    def _normalize_llm_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        intent = str(result.get("intent", "clarify")).strip().lower()
+        if intent not in self.VALID_INTENTS:
+            intent = "clarify"
+
+        try:
+            confidence = float(result.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+
+        commands = result.get("commands", [])
+        if not isinstance(commands, list):
+            commands = []
+
+        response = result.get("response", "")
+        if not isinstance(response, str):
+            response = str(response) if response is not None else ""
+
+        reason = result.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            reason = str(reason)
+
+        if intent == "ignore" or (confidence < 0.45 and not commands):
+            return {
+                "intent": "ignore",
+                "confidence": confidence,
+                "commands": [],
+                "response": "",
+                "reason": reason or "低置信度或非绘画相关内容"
+            }
+
+        if intent == "clarify":
+            commands = []
+            if not response:
+                response = "请再具体说明一下你想怎么修改画布。"
+
+        return {
+            "intent": intent,
+            "confidence": confidence,
+            "commands": commands,
+            "response": response,
+            "reason": reason
+        }
 
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
         """获取用户的激活LLM配置"""
@@ -243,18 +253,18 @@ class LLMService:
 
             content = response.choices[0].message.content
 
-            # 解析JSON响应
+            # 解析并规范化JSON响应
             try:
-                result = json.loads(content)
-                return {
-                    "commands": result.get("commands", []),
-                    "response": result.get("response", "已执行命令")
-                }
+                result = self._extract_json(content or "")
+                return self._normalize_llm_result(result)
             except json.JSONDecodeError:
-                # 如果返回的不是标准JSON，尝试提取
+                # 无法解析时默认追问，避免误操作画布
                 return {
+                    "intent": "clarify",
+                    "confidence": 0.0,
                     "commands": [],
-                    "response": content
+                    "response": "我没能可靠理解这句话，请再说一次绘画指令。",
+                    "reason": "LLM返回内容不是有效JSON"
                 }
 
         except Exception as e:

@@ -11,7 +11,6 @@ import './VoiceControl.css'
 
 export default function VoiceControl() {
   const {
-    isListening,
     status,
     recognizedText,
     recognitionType,
@@ -98,9 +97,24 @@ export default function VoiceControl() {
         llm_config_id: activeConfig?.id,
       })
 
+      if (response.intent === 'ignore') {
+        return
+      }
+
+      if (response.intent === 'clarify') {
+        if (response.response) {
+          message.info(response.response)
+        }
+        return
+      }
+
       setStatus('drawing')
-      executeCommands(response.commands)
-      message.success(response.response)
+      if (response.commands.length > 0) {
+        executeCommands(response.commands)
+      }
+      if (response.response) {
+        message.success(response.response)
+      }
     } catch (error: any) {
       message.error(error.response?.data?.detail || '处理命令失败')
     } finally {

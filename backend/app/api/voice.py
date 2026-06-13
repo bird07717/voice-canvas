@@ -34,14 +34,6 @@ async def process_voice_command(
             detail="Canvas not found"
         )
 
-    # 保存用户消息
-    user_message = ChatHistory(
-        canvas_id=request.canvas_id,
-        role="user",
-        content=request.text
-    )
-    db.add(user_message)
-
     # 调用LLM服务
     llm_service = LLMService(db)
     try:
@@ -56,12 +48,35 @@ async def process_voice_command(
             detail=f"LLM service error: {str(e)}"
         )
 
+    if llm_response["intent"] == "ignore":
+        return VoiceCommandResponse(
+            intent=llm_response["intent"],
+            confidence=llm_response["confidence"],
+            commands=[],
+            response="",
+            reason=llm_response.get("reason"),
+            chat_history=[]
+        )
+
+    # 非忽略内容才保存到对话历史，避免背景噪声污染画布上下文
+    user_message = ChatHistory(
+        canvas_id=request.canvas_id,
+        role="user",
+        content=request.text
+    )
+    db.add(user_message)
+
     # 保存助手消息
     assistant_message = ChatHistory(
         canvas_id=request.canvas_id,
         role="assistant",
         content=llm_response["response"],
-        command_json={"commands": llm_response["commands"]}
+        command_json={
+            "intent": llm_response["intent"],
+            "confidence": llm_response["confidence"],
+            "commands": llm_response["commands"],
+            "reason": llm_response.get("reason")
+        }
     )
     db.add(assistant_message)
     await db.commit()
@@ -76,8 +91,11 @@ async def process_voice_command(
     chat_history = history_result.scalars().all()
 
     return VoiceCommandResponse(
+        intent=llm_response["intent"],
+        confidence=llm_response["confidence"],
         commands=llm_response["commands"],
         response=llm_response["response"],
+        reason=llm_response.get("reason"),
         chat_history=[ChatMessage.model_validate(msg) for msg in chat_history]
     )
 
