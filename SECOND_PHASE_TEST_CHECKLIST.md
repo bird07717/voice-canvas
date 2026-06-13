@@ -53,3 +53,11 @@
 - [x] 后端容器内语法检查通过。
 - [x] 前端 Vite 临时输出目录构建通过。
 - [ ] 浏览器语音端到端手动测试待执行。
+
+## Day 20 完成记录
+
+- [x] 第二阶段 Scene Planner 代码实现完成。
+- [x] README / PROJECT_OVERVIEW 已更新。
+- [x] Scene Planner 技术文档和演示脚本已补充。
+- [x] 最终 `npm run build` 通过。
+- [x] 最终后端语法检查通过。
