@@ -20,7 +20,7 @@ export default function VoiceControl() {
     setRecognitionType
   } = useVoiceStore()
   const { activeConfig, setIsProcessing, setChatHistory } = useLLMStore()
-  const { currentCanvasId, addObject, updateObject, removeObject, clearCanvas, undo } = useCanvasStore()
+  const { currentCanvasId, canvasObjects, addObject, updateObject, removeObject, clearCanvas, undo } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
   const lastFinalTimeRef = useRef(0)
@@ -140,10 +140,13 @@ export default function VoiceControl() {
   }
 
   const executeCommands = (commands: DrawCommand[]) => {
+    let lastCreatedId: string | null = null
+
     commands.forEach((cmd) => {
       switch (cmd.action) {
         case 'create':
           if (cmd.type && cmd.id) {
+            lastCreatedId = cmd.id
             addObject({
               id: cmd.id,
               type: cmd.type,
@@ -155,19 +158,28 @@ export default function VoiceControl() {
 
         case 'modify':
           if (cmd.target && cmd.params) {
-            updateObject(cmd.target, cmd.params)
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            if (target) {
+              updateObject(target, cmd.params)
+            }
           }
           break
 
         case 'move':
           if (cmd.target && cmd.params) {
-            updateObject(cmd.target, { x: cmd.params.x, y: cmd.params.y })
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            if (target) {
+              updateObject(target, { x: cmd.params.x, y: cmd.params.y })
+            }
           }
           break
 
         case 'delete':
           if (cmd.target) {
-            removeObject(cmd.target)
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            if (target) {
+              removeObject(target)
+            }
           }
           break
 
@@ -183,6 +195,22 @@ export default function VoiceControl() {
           console.warn('未知命令:', cmd)
       }
     })
+  }
+
+  const resolveCommandTarget = (target: string, lastCreatedId: string | null) => {
+    if (target === '__last__') {
+      return lastCreatedId || canvasObjects[canvasObjects.length - 1]?.id || null
+    }
+
+    if (target.startsWith('__kind__:')) {
+      const kind = target.replace('__kind__:', '').toLowerCase()
+      const matched = [...canvasObjects]
+        .reverse()
+        .find((obj) => obj.type?.toLowerCase() === kind || obj.params?.kind?.toLowerCase() === kind)
+      return matched?.id || null
+    }
+
+    return target
   }
 
   const getRecognitionTypeLabel = () => {
