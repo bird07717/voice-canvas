@@ -41,7 +41,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus,
     setRecognitionType
   } = useVoiceStore()
-  const { activeConfig, setIsProcessing, setChatHistory } = useLLMStore()
+  const { activeConfig, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
   const {
     addObject,
     updateObject,
@@ -94,8 +94,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         (text, isFinal) => {
           setRecognizedText(text)
           setErrorMessage('')
-          setStatus(isFinal ? 'thinking' : 'recognizing')
-          setExecutionMessage(isFinal ? '正在理解...' : '正在识别...')
+          setStatus('recognizing')
+          setExecutionMessage(isFinal ? '正在匹配命令...' : '正在识别...')
           if (isFinal) {
             const normalizedText = text.trim()
             const now = Date.now()
@@ -171,6 +171,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         if (fastCommand.controlAction) {
           const completed = await executeControlAction(fastCommand.controlAction)
           if (!completed) return
+          appendLocalChat(text, fastCommand.message || fastCommand.interpretation || '已完成', [])
           setStatus('done')
           setExecutionMessage(fastCommand.message || '已完成')
           return
@@ -186,6 +187,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
             return
           }
           recordCommands(fastCommand.commands)
+          appendLocalChat(text, result.message || fastCommand.message || fastCommand.interpretation || '已完成', fastCommand.commands)
           setStatus('done')
           setExecutionMessage(result.message || fastCommand.message || '已完成')
           return
@@ -209,8 +211,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
     setStatus('thinking')
     setLastCommandSource('llm')
-    setInterpretedText('正在生成复杂图形...')
-    setExecutionMessage(fastCommand.message || '这个命令我还不会，我会交给 AI 理解。')
+    setInterpretedText('复杂绘图或编辑命令，交给 AI 继续理解。')
+    setExecutionMessage('AI 正在根据你的指令生成绘图步骤...')
     setIsProcessing(true)
 
     try {
@@ -229,6 +231,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
       if (response.chat_history.length > 0) {
         setChatHistory(response.chat_history)
+        notifyChatHistoryUpdated(canvasState.currentCanvasId)
       }
 
       if (response.intent === 'clarify') {
@@ -262,6 +265,33 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const appendLocalChat = (userText: string, assistantText: string, commands: DrawCommand[]) => {
+    const now = new Date().toISOString()
+    addChatMessage({
+      role: 'user',
+      content: userText,
+      created_at: now,
+    })
+    addChatMessage({
+      role: 'assistant',
+      content: assistantText,
+      command_json: {
+        intent: 'fast',
+        confidence: 1,
+        commands,
+      },
+      created_at: now,
+    })
+  }
+
+  const notifyChatHistoryUpdated = (canvasId: number | null) => {
+    window.dispatchEvent(
+      new CustomEvent('voice-canvas:chat-history-updated', {
+        detail: { canvasId },
+      })
+    )
   }
 
   const buildCanvasContext = (): CanvasCommandContext => {
@@ -414,8 +444,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         case 'move':
           if (cmd.target && cmd.params) {
             const target = resolveCommandTarget(cmd.target, lastCreatedId)
-            if (target) {
-              updateObject(target, { x: cmd.params.x, y: cmd.params.y })
+            const updates = target ? getMoveToUpdates(target, cmd.params.x, cmd.params.y) : null
+            if (target && updates) {
+              updateObject(target, updates)
               executedCount += 1
             }
           }
@@ -507,6 +538,15 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     if (!obj) return null
 
     const params = obj.params || {}
+    if (obj.type === 'group') {
+      const bounds = getObjectBounds(obj)
+      if (!bounds) return null
+      return {
+        x: bounds.x + dx,
+        y: bounds.y + dy,
+      }
+    }
+
     if (Array.isArray(params.points)) {
       return {
         points: params.points.map((point: number, index: number) =>
@@ -519,6 +559,23 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       x: (params.x || 0) + dx,
       y: (params.y || 0) + dy,
     }
+  }
+
+  const getMoveToUpdates = (targetId: string, x: number, y: number) => {
+    const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
+    if (!obj || typeof x !== 'number' || typeof y !== 'number') return null
+
+    const bounds = getObjectBounds(obj)
+    if (!bounds) {
+      return {
+        x,
+        y,
+      }
+    }
+
+    const currentCenterX = bounds.x + bounds.width / 2
+    const currentCenterY = bounds.y + bounds.height / 2
+    return getMoveByUpdates(targetId, x - currentCenterX, y - currentCenterY)
   }
 
   const getScaleUpdates = (targetId: string, scale: number) => {
@@ -676,8 +733,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
             <span className="voice-feedback-value">{interpretedText || getCommandSourceLabel()}</span>
           </div>
           <div className="voice-feedback-row">
-            <span className="voice-feedback-label">执行结果</span>
-            <span className="voice-feedback-value">{executionMessage || '暂无执行结果'}</span>
+            <span className="voice-feedback-label">执行状态</span>
+            <span className="voice-feedback-value">{executionMessage || '暂无执行状态'}</span>
           </div>
           {errorMessage && (
             <div className="voice-error-box">

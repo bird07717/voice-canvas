@@ -1,9 +1,7 @@
 import { Badge } from 'antd'
 import {
   AudioOutlined,
-  LoadingOutlined,
   CheckCircleOutlined,
-  SyncOutlined,
   CloseCircleOutlined,
 } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
@@ -24,7 +22,7 @@ export default function StatusBar() {
         }
       case 'recognizing':
         return {
-          icon: <LoadingOutlined className="status-icon" style={{ color: '#1890ff' }} />,
+          icon: <span className="status-spinner status-spinner-blue" aria-hidden="true" />,
           text: '识别中...',
           color: 'processing',
         }
@@ -36,13 +34,13 @@ export default function StatusBar() {
         }
       case 'thinking':
         return {
-          icon: <LoadingOutlined className="status-icon" style={{ color: '#1890ff' }} />,
+          icon: <span className="status-spinner status-spinner-blue" aria-hidden="true" />,
           text: '理解中...',
           color: 'processing',
         }
       case 'drawing':
         return {
-          icon: <SyncOutlined className="status-icon" spin style={{ color: '#722ed1' }} />,
+          icon: <span className="status-spinner status-spinner-purple" aria-hidden="true" />,
           text: '绘制中...',
           color: 'processing',
         }

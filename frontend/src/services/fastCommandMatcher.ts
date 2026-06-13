@@ -40,6 +40,12 @@ const parseColor = (text: string, fallback = '#60a5fa') => {
   }
 }
 
+const hasExplicitColor = (text: string) =>
+  COLOR_MAP.some(([pattern]) => pattern.test(text))
+
+const getShapeColor = (text: string) =>
+  parseColor(text, '#60a5fa')
+
 const resolveContextTarget = (context: CanvasCommandContext) =>
   context.selectedObjectId ||
   context.lastModifiedObjectId ||
@@ -202,9 +208,33 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  const color = parseColor(text)
+  const cornerMap: Array<[RegExp, string, number, number]> = [
+    [/(移动|移到|移动到|放到|放在)?左上角$/, '移动到左上角', 130, 110],
+    [/(移动|移到|移动到|放到|放在)?右上角$/, '移动到右上角', 670, 110],
+    [/(移动|移到|移动到|放到|放在)?左下角$/, '移动到左下角', 130, 490],
+    [/(移动|移到|移动到|放到|放在)?右下角$/, '移动到右下角', 670, 490],
+    [/(移动|移到|移动到|放到|放在)?中间$/, '移动到画布中间', 400, 300],
+    [/(移动|移到|移动到|放到|放在)?中央$/, '移动到画布中央', 400, 300],
+  ]
+  const cornerMatch = cornerMap.find(([pattern]) => pattern.test(text))
+  if (cornerMatch) {
+    if (!target) {
+      return {
+        matched: true,
+        interpretation: cornerMatch[1],
+        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+      }
+    }
 
-  if (/^(画|来一个|来个|创建|生成).*(圆|圆形)$/.test(text) || /^(画圆|画个圆)$/.test(text)) {
+    return commandResult(cornerMatch[1], [
+      { action: 'move', target, params: { x: cornerMatch[2], y: cornerMatch[3] } },
+    ] as DrawCommand[])
+  }
+
+  const color = getShapeColor(text)
+  const shapePrefix = '(画|换一个|换个|来一个|来个|创建|生成|加一个|加个)'
+
+  if (new RegExp(`^${shapePrefix}.*(圆|圆形)$`).test(text) || /^(画圆|画个圆)$/.test(text)) {
     const label = `${color.label || ''}圆形`
     return commandResult(`创建${label}`, [
       {
@@ -216,7 +246,7 @@ export function matchFastCommand(
           y: 300,
           radius: 50,
           fill: color.value,
-          stroke: color.value,
+          stroke: hasExplicitColor(text) ? color.value : '#111827',
           strokeWidth: 2,
           kind: 'circle',
         },
@@ -224,7 +254,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(画|来一个|来个|创建|生成).*(矩形|长方形|方块)$/.test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(矩形|长方形|方块|方形|正方形)$`).test(text)) {
     const label = `${color.label || ''}矩形`
     return commandResult(`创建${label}`, [
       {
@@ -237,7 +267,7 @@ export function matchFastCommand(
           width: 120,
           height: 80,
           fill: color.value,
-          stroke: color.value,
+          stroke: hasExplicitColor(text) ? color.value : '#111827',
           strokeWidth: 2,
           kind: 'rect',
         },
@@ -245,7 +275,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(画|来一条|创建|生成).*(线|直线)$/.test(text) || /^画线$/.test(text)) {
+  if (new RegExp(`^(画|来一条|创建|生成|加一条).*(线|直线)$`).test(text) || /^画线$/.test(text)) {
     return commandResult('创建线条', [
       {
         action: 'create',
@@ -253,7 +283,7 @@ export function matchFastCommand(
         type: 'line',
         params: {
           points: [300, 300, 500, 300],
-          stroke: color.value || '#111827',
+          stroke: hasExplicitColor(text) ? color.value : '#111827',
           strokeWidth: 4,
           lineCap: 'round',
           lineJoin: 'round',
@@ -263,7 +293,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(画|来一个|来个|创建|生成).*(星星|五角星)$/.test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(星星|五角星)$`).test(text)) {
     return commandResult('创建星星', [
       {
         action: 'create',
@@ -276,7 +306,7 @@ export function matchFastCommand(
           innerRadius: 25,
           outerRadius: 55,
           fill: color.value,
-          stroke: color.value,
+          stroke: hasExplicitColor(text) ? color.value : '#111827',
           strokeWidth: 2,
           kind: 'star',
         },

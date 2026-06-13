@@ -25,6 +25,84 @@ const translateChild = (child: CanvasObject, dx: number, dy: number): CanvasObje
   }
 }
 
+const getShapeBounds = (obj: CanvasObject) => {
+  const params = obj.params || {}
+
+  if (obj.type === 'group') {
+    const childBounds = (obj.children || [])
+      .map((child) => getShapeBounds(child))
+      .filter(Boolean) as Array<{ x: number; y: number; width: number; height: number }>
+
+    if (!childBounds.length) return null
+
+    const minX = Math.min(...childBounds.map((bounds) => bounds.x))
+    const minY = Math.min(...childBounds.map((bounds) => bounds.y))
+    const maxX = Math.max(...childBounds.map((bounds) => bounds.x + bounds.width))
+    const maxY = Math.max(...childBounds.map((bounds) => bounds.y + bounds.height))
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }
+  }
+
+  if (Array.isArray(params.points) && params.points.length >= 4) {
+    const xs = params.points.filter((_: number, index: number) => index % 2 === 0)
+    const ys = params.points.filter((_: number, index: number) => index % 2 === 1)
+    const minX = Math.min(...xs)
+    const minY = Math.min(...ys)
+    const maxX = Math.max(...xs)
+    const maxY = Math.max(...ys)
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }
+  }
+
+  if (typeof params.x !== 'number' || typeof params.y !== 'number') return null
+
+  if (typeof params.radius === 'number') {
+    return {
+      x: params.x - params.radius,
+      y: params.y - params.radius,
+      width: params.radius * 2,
+      height: params.radius * 2,
+    }
+  }
+
+  if (obj.type === 'star') {
+    const radius = Number(params.outerRadius || 40)
+    return {
+      x: params.x - radius,
+      y: params.y - radius,
+      width: radius * 2,
+      height: radius * 2,
+    }
+  }
+
+  if (obj.type === 'text') {
+    const text = String(params.text || '')
+    const fontSize = Number(params.fontSize || 24)
+    return {
+      x: params.x,
+      y: params.y,
+      width: Math.max(40, text.length * fontSize * 0.62),
+      height: fontSize * 1.4,
+    }
+  }
+
+  return {
+    x: params.x,
+    y: params.y,
+    width: Number(params.width || 0),
+    height: Number(params.height || 0),
+  }
+}
+
 export default function CanvasBoard() {
   const stageRef = useRef<any>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -67,17 +145,8 @@ export default function CanvasBoard() {
     }
   }, [])
 
-  const getSelectedProps = (obj: CanvasObject, nested: boolean) => {
-    if (nested || obj.id !== selectedObjectId) return {}
-
-    return {
-      stroke: '#2563eb',
-      strokeWidth: Math.max(3, Number(obj.params?.strokeWidth || 1) + 2),
-      shadowColor: '#2563eb',
-      shadowBlur: 8,
-      shadowOpacity: 0.28,
-    }
-  }
+  const selectedObject = canvasObjects.find((obj) => obj.id === selectedObjectId) || null
+  const selectedBounds = selectedObject ? getShapeBounds(selectedObject) : null
 
   const handleDragEnd = (obj: CanvasObject, event: any) => {
     const node = event.target
@@ -116,7 +185,6 @@ export default function CanvasBoard() {
       id: obj.id,
       draggable: !nested,
       ...obj.params,
-      ...getSelectedProps(obj, nested),
       onClick: (event: any) => {
         if (nested) return
         event.cancelBubble = true
@@ -199,6 +267,22 @@ export default function CanvasBoard() {
         >
           <Layer>
             {canvasObjects.map((obj) => renderObject(obj))}
+            {selectedBounds && (
+              <Rect
+                x={selectedBounds.x - 8}
+                y={selectedBounds.y - 8}
+                width={selectedBounds.width + 16}
+                height={selectedBounds.height + 16}
+                stroke="#2563eb"
+                strokeWidth={2}
+                dash={[8, 5]}
+                cornerRadius={6}
+                listening={false}
+                shadowColor="#2563eb"
+                shadowBlur={6}
+                shadowOpacity={0.18}
+              />
+            )}
           </Layer>
         </Stage>
       </div>
