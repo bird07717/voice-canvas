@@ -303,9 +303,38 @@ arguments: {"reason": "忽略原因"}
             "reason": reason
         }
 
-    def _execute_tool_plan(self, result: Dict[str, Any]) -> Dict[str, Any]:
+    def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:
+        if not canvas_context:
+            return "当前画布上下文：无。"
+
+        objects = canvas_context.get("objects") or []
+        object_lines = []
+        for obj in objects[-20:]:
+            object_lines.append(
+                f"- id={obj.get('id')}, type={obj.get('type')}, kind={obj.get('kind')}, "
+                f"text={obj.get('text')}, x={obj.get('x')}, y={obj.get('y')}"
+            )
+
+        recent_commands = canvas_context.get("recentCommands") or []
+        recent_summary = json.dumps(recent_commands[-5:], ensure_ascii=False)
+
+        return "\n".join([
+            "当前画布上下文：",
+            f"lastCreatedObjectId={canvas_context.get('lastCreatedObjectId')}",
+            f"lastModifiedObjectId={canvas_context.get('lastModifiedObjectId')}",
+            f"selectedObjectId={canvas_context.get('selectedObjectId')}",
+            "objects:",
+            *(object_lines or ["- 无对象"]),
+            f"recentCommands={recent_summary}"
+        ])
+
+    def _execute_tool_plan(
+        self,
+        result: Dict[str, Any],
+        canvas_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         plan = parse_drawing_plan(result)
-        executed = DrawingExecutor().execute(plan)
+        executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
@@ -335,7 +364,8 @@ arguments: {"reason": "忽略原因"}
         self,
         user_id: int,
         text: str,
-        llm_config_id: Optional[int] = None
+        llm_config_id: Optional[int] = None,
+        canvas_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """处理用户语音命令，调用LLM生成绘图指令"""
 
@@ -359,6 +389,7 @@ arguments: {"reason": "忽略原因"}
                 model=config.model_name,
                 messages=[
                     {"role": "system", "content": self.TOOL_PLANNING_PROMPT},
+                    {"role": "system", "content": self._format_canvas_context(canvas_context)},
                     {"role": "user", "content": text}
                 ],
                 temperature=0.7,
@@ -371,7 +402,7 @@ arguments: {"reason": "忽略原因"}
             try:
                 result = self._extract_json(content or "")
                 if "calls" in result:
-                    return self._execute_tool_plan(result)
+                    return self._execute_tool_plan(result, canvas_context)
                 return self._normalize_llm_result(result)
             except (json.JSONDecodeError, ToolParseError):
                 # 无法解析时默认追问，避免误操作画布

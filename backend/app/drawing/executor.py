@@ -73,8 +73,9 @@ COLOR_ALIASES = {
 
 
 class DrawingExecutor:
-    def __init__(self):
+    def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self._id_counter = count(1)
+        self.canvas_context = canvas_context or {}
 
     def execute(self, plan: DrawingPlan) -> Dict[str, Any]:
         commands: List[Dict[str, Any]] = []
@@ -267,10 +268,34 @@ class DrawingExecutor:
     def _resolve_target(self, target: TargetSpec) -> Optional[str]:
         if target.ref == "id" and target.id:
             return target.id
+        if target.ref == "selected":
+            return self.canvas_context.get("selectedObjectId") or self.canvas_context.get("lastModifiedObjectId")
+        if target.ref == "last":
+            return (
+                self.canvas_context.get("lastModifiedObjectId")
+                or self.canvas_context.get("lastCreatedObjectId")
+                or self._last_object_id()
+                or "__last__"
+            )
+        if target.ref == "kind" and target.kind:
+            return self._find_object_by_kind(target.kind) or f"__kind__:{target.kind}"
         if target.ref in {"last", "selected"}:
             return "__last__"
-        if target.ref == "kind" and target.kind:
-            return f"__kind__:{target.kind}"
+        return None
+
+    def _last_object_id(self) -> Optional[str]:
+        objects = self.canvas_context.get("objects") or []
+        if not objects:
+            return None
+        return objects[-1].get("id")
+
+    def _find_object_by_kind(self, kind: str) -> Optional[str]:
+        normalized_kind = self._normalize_template_kind(kind.lower())
+        objects = self.canvas_context.get("objects") or []
+        for obj in reversed(objects):
+            obj_kind = str(obj.get("kind") or obj.get("type") or "").lower()
+            if self._normalize_template_kind(obj_kind) == normalized_kind:
+                return obj.get("id")
         return None
 
     def _resolve_position(self, position: PositionSpec) -> Tuple[float, float]:

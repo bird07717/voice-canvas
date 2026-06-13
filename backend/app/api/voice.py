@@ -143,7 +143,8 @@ async def process_voice_command(
         llm_response = await llm_service.process_command(
             user_id=current_user.id,
             text=request.text,
-            llm_config_id=request.llm_config_id
+            llm_config_id=request.llm_config_id,
+            canvas_context=request.canvas_context
         )
     except Exception as e:
         raise HTTPException(
