@@ -50,10 +50,21 @@ export interface VoiceCommandRequest {
   llm_config_id?: number
 }
 
+export type VoiceIntent =
+  | 'draw'
+  | 'edit'
+  | 'control'
+  | 'delete'
+  | 'clarify'
+  | 'ignore'
+
 // 语音命令响应
 export interface VoiceCommandResponse {
+  intent: VoiceIntent
+  confidence: number
   commands: DrawCommand[]
   response: string
+  reason?: string
   chat_history: ChatMessage[]
 }
 

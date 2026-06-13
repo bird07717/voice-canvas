@@ -38,7 +38,14 @@ export default function CanvasBoard() {
         return <Text {...commonProps} />
 
       case 'star':
-        return <Star {...commonProps} />
+        return (
+          <Star
+            {...commonProps}
+            numPoints={obj.params.numPoints ?? 5}
+            innerRadius={obj.params.innerRadius ?? 20}
+            outerRadius={obj.params.outerRadius ?? 40}
+          />
+        )
 
       case 'group':
         return (

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { message } from 'antd'
+import { VoiceCommandResponse } from '@/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -106,7 +107,7 @@ class ApiService {
     canvas_id: number
     text: string
     llm_config_id?: number
-  }) {
+  }): Promise<VoiceCommandResponse> {
     const response = await this.client.post('/api/voice/command', data)
     return response.data
   }

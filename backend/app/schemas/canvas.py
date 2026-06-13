@@ -43,6 +43,9 @@ class VoiceCommandRequest(BaseModel):
 
 
 class VoiceCommandResponse(BaseModel):
+    intent: str
+    confidence: float = 0.0
     commands: List[dict]
     response: str
+    reason: Optional[str] = None
     chat_history: List[ChatMessage]

@@ -26,7 +26,7 @@ import LLMSettings from '@/components/LLMSettings'
 import BaiduASRSettings from '@/components/BaiduASRSettings'
 import './Home.css'
 
-const { Header, Content, Sider } = Layout
+const { Header, Content } = Layout
 
 export default function Home() {
   const navigate = useNavigate()

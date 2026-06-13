@@ -44,7 +44,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   updateObject: (id, updates) => {
     set((state) => ({
       canvasObjects: state.canvasObjects.map((obj) =>
-        obj.id === id ? { ...obj, ...updates } : obj
+        obj.id === id
+          ? { ...obj, params: { ...obj.params, ...updates } }
+          : obj
       ),
     }))
     get().saveToHistory()
