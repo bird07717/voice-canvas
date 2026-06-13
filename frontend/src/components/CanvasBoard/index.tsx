@@ -103,6 +103,35 @@ const getShapeBounds = (obj: CanvasObject) => {
   }
 }
 
+const getObjectLabel = (obj: CanvasObject) => {
+  const kind = String(obj.params?.kind || obj.type || '')
+  const labels: Record<string, string> = {
+    circle: '圆形',
+    round: '圆形',
+    rect: '矩形',
+    rectangle: '矩形',
+    square: '方形',
+    line: '线条',
+    polygon: '多边形',
+    star: '星星',
+    text: '文字',
+    group: '组合',
+    sun: '太阳',
+    tree: '树',
+    cloud: '云',
+    house: '房子',
+    flower: '花',
+    person: '小人',
+    car: '汽车',
+    mountain: '山',
+    grass: '草地',
+    road: '道路',
+    river: '河流',
+  }
+
+  return labels[kind.toLowerCase()] || kind || '对象'
+}
+
 export default function CanvasBoard() {
   const stageRef = useRef<any>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -268,20 +297,43 @@ export default function CanvasBoard() {
           <Layer>
             {canvasObjects.map((obj) => renderObject(obj))}
             {selectedBounds && (
-              <Rect
-                x={selectedBounds.x - 8}
-                y={selectedBounds.y - 8}
-                width={selectedBounds.width + 16}
-                height={selectedBounds.height + 16}
-                stroke="#2563eb"
-                strokeWidth={2}
-                dash={[8, 5]}
-                cornerRadius={6}
-                listening={false}
-                shadowColor="#2563eb"
-                shadowBlur={6}
-                shadowOpacity={0.18}
-              />
+              <>
+                <Rect
+                  x={selectedBounds.x - 8}
+                  y={selectedBounds.y - 8}
+                  width={selectedBounds.width + 16}
+                  height={selectedBounds.height + 16}
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dash={[8, 5]}
+                  cornerRadius={6}
+                  listening={false}
+                  shadowColor="#2563eb"
+                  shadowBlur={6}
+                  shadowOpacity={0.18}
+                />
+                {selectedObject && (
+                  <>
+                    <Rect
+                      x={selectedBounds.x - 8}
+                      y={Math.max(4, selectedBounds.y - 34)}
+                      width={Math.max(72, getObjectLabel(selectedObject).length * 14 + 38)}
+                      height={22}
+                      fill="#2563eb"
+                      cornerRadius={5}
+                      listening={false}
+                    />
+                    <Text
+                      x={selectedBounds.x + 2}
+                      y={Math.max(8, selectedBounds.y - 29)}
+                      text={`当前：${getObjectLabel(selectedObject)}`}
+                      fontSize={12}
+                      fill="#ffffff"
+                      listening={false}
+                    />
+                  </>
+                )}
+              </>
             )}
           </Layer>
         </Stage>

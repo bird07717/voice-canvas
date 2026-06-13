@@ -50,6 +50,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     undo,
     redo,
     recordCommands,
+    setSelectedObjectId,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
@@ -469,6 +470,16 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
             const updates = target ? getScaleUpdates(target, cmd.params.scale || 1) : null
             if (target && updates) {
               updateObject(target, updates)
+              executedCount += 1
+            }
+          }
+          break
+
+        case 'select':
+          if (cmd.target) {
+            const target = resolveCommandTarget(cmd.target, lastCreatedId)
+            if (target) {
+              setSelectedObjectId(target)
               executedCount += 1
             }
           }
