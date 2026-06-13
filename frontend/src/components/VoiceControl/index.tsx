@@ -20,6 +20,10 @@ type CommandExecutionResult = {
   message: string
 }
 
+type CommandExecutionOptions = {
+  deferHistory?: boolean
+}
+
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
@@ -52,6 +56,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     undo,
     redo,
     recordCommands,
+    saveToHistory,
     setSelectedObjectId,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
@@ -282,12 +287,14 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     for (const [index, command] of commands.entries()) {
       setExecutionMessage(`正在绘制场景：${index + 1} / ${commands.length}`)
       await wait(120)
-      const result = executeCommands([command])
+      const result = executeCommands([command], { deferHistory: true })
       if (!result.success) {
         return result
       }
       successCount += 1
     }
+
+    saveToHistory()
 
     return {
       success: successCount > 0,
@@ -443,7 +450,10 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     }
   }
 
-  const executeCommands = (commands: DrawCommand[]): CommandExecutionResult => {
+  const executeCommands = (
+    commands: DrawCommand[],
+    options: CommandExecutionOptions = {}
+  ): CommandExecutionResult => {
     let lastCreatedId: string | null = null
     let executedCount = 0
 
@@ -457,7 +467,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
               type: cmd.type,
               params: cmd.params || {},
               children: cmd.children,
-            })
+            }, { deferHistory: options.deferHistory })
             executedCount += 1
           }
           break
