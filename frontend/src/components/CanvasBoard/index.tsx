@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Stage, Layer, Circle, Rect, Line, Text, Star, Group } from 'react-konva'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { CanvasObject } from '@/types'
@@ -8,6 +8,8 @@ const CANVAS_HEIGHT = 600
 
 export default function CanvasBoard() {
   const stageRef = useRef<any>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const [scale, setScale] = useState(1)
   const { canvasObjects, setStageRef } = useCanvasStore()
 
   useEffect(() => {
@@ -15,6 +17,30 @@ export default function CanvasBoard() {
       setStageRef(stageRef.current)
     }
   }, [stageRef, setStageRef])
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (!frameRef.current) return
+
+      const { width, height } = frameRef.current.getBoundingClientRect()
+      const nextScale = Math.min(width / CANVAS_WIDTH, height / CANVAS_HEIGHT, 1.35)
+      setScale(Math.max(0.7, nextScale))
+    }
+
+    updateScale()
+
+    const observer = new ResizeObserver(updateScale)
+    if (frameRef.current) {
+      observer.observe(frameRef.current)
+    }
+
+    window.addEventListener('resize', updateScale)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateScale)
+    }
+  }, [])
 
   const renderObject = (obj: CanvasObject) => {
     const commonProps = {
@@ -63,16 +89,26 @@ export default function CanvasBoard() {
   }
 
   return (
-    <div className="konva-container">
-      <Stage
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        ref={stageRef}
+    <div className="canvas-board-frame" ref={frameRef}>
+      <div
+        className="konva-container"
+        style={{
+          width: CANVAS_WIDTH * scale,
+          height: CANVAS_HEIGHT * scale,
+        }}
       >
-        <Layer>
-          {canvasObjects.map((obj) => renderObject(obj))}
-        </Layer>
-      </Stage>
+        <Stage
+          width={CANVAS_WIDTH * scale}
+          height={CANVAS_HEIGHT * scale}
+          scaleX={scale}
+          scaleY={scale}
+          ref={stageRef}
+        >
+          <Layer>
+            {canvasObjects.map((obj) => renderObject(obj))}
+          </Layer>
+        </Stage>
+      </div>
     </div>
   )
 }

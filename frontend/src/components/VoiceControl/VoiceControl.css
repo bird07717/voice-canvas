@@ -1,28 +1,47 @@
 .voice-control {
-  padding: 20px;
+  padding: 18px;
   height: 100%;
   display: flex;
   flex-direction: column;
+  color: #172033;
 }
 
 .voice-control-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .voice-control h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.voice-control .ant-space {
+  gap: 14px !important;
+}
+
+.voice-control .ant-btn {
+  height: 46px;
+  border-radius: 10px;
+  font-weight: 650;
+}
+
+.voice-control .ant-btn-primary {
+  border: 0;
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
 }
 
 .recognized-text-box {
   padding: 12px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  margin-top: 12px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  border-radius: 10px;
+  margin-top: 0;
 }
 
 .recognized-text-box .label {
@@ -35,41 +54,53 @@
 .recognized-text-box .text {
   margin: 0;
   font-size: 14px;
-  color: #333;
+  color: #172033;
   line-height: 1.6;
 }
 
 .voice-tips {
-  margin-top: 24px;
-  padding: 12px;
-  background: #e6f7ff;
-  border-radius: 4px;
+  margin-top: 0;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .voice-tips h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #1890ff;
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #2563eb;
+  font-weight: 700;
 }
 
 .voice-tips ul {
   margin: 0;
-  padding-left: 20px;
+  padding: 0;
+  list-style: none;
 }
 
 .voice-tips li {
   font-size: 13px;
-  color: #666;
-  line-height: 2;
+  color: #475569;
+  line-height: 1.45;
+  padding: 7px 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.voice-tips li:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .voice-status-info {
-  margin-top: 16px;
+  margin-top: 0;
   padding: 12px;
-  background: #fff7e6;
-  border-radius: 4px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: 10px;
   font-size: 12px;
-  color: #fa8c16;
+  color: #b45309;
 }
 
 .voice-status-info p {
