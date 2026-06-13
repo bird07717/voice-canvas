@@ -244,7 +244,8 @@ class DrawingExecutor:
         if not target:
             return None
 
-        params = self._normalize_changes(args.changes)
+        target_object = self._find_object_by_id(target)
+        params = self._normalize_changes(args.changes, target_object)
         if not params:
             return None
 
@@ -347,9 +348,18 @@ class DrawingExecutor:
             params["rotation"] = style.rotation
         return params
 
-    def _normalize_changes(self, changes: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_changes(
+        self,
+        changes: Dict[str, Any],
+        target_object: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         normalized: Dict[str, Any] = {}
+        current = target_object or {}
+
         for key, value in changes.items():
+            if key in {"dx", "dy", "scale_delta"}:
+                continue
+
             normalized_key = {
                 "color": "fill",
                 "stroke_width": "strokeWidth",
@@ -359,7 +369,28 @@ class DrawingExecutor:
                 normalized[normalized_key] = self._color(value) or value
             else:
                 normalized[normalized_key] = value
+
+        if "dx" in changes:
+            normalized["x"] = float(current.get("x") or 0) + float(changes["dx"])
+        if "dy" in changes:
+            normalized["y"] = float(current.get("y") or 0) + float(changes["dy"])
+        if "scale_delta" in changes:
+            scale_delta = float(changes["scale_delta"])
+            if current.get("radius") is not None:
+                normalized["radius"] = float(current["radius"]) * scale_delta
+            if current.get("width") is not None:
+                normalized["width"] = float(current["width"]) * scale_delta
+            if current.get("height") is not None:
+                normalized["height"] = float(current["height"]) * scale_delta
+
         return normalized
+
+    def _find_object_by_id(self, object_id: str) -> Optional[Dict[str, Any]]:
+        objects = self.canvas_context.get("objects") or []
+        for obj in objects:
+            if obj.get("id") == object_id:
+                return obj
+        return None
 
     def _color(self, color: Optional[str]) -> Optional[str]:
         if not color:
