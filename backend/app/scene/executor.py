@@ -54,6 +54,18 @@ ANCHOR_POINTS = {
     "right": (670, 300),
 }
 
+ANCHOR_SLOTS = {
+    "bottom": [(260, 500), (400, 500), (540, 500)],
+    "top": [(260, 100), (400, 100), (540, 100)],
+    "left": [(120, 220), (120, 350), (120, 480)],
+    "right": [(680, 220), (680, 350), (680, 480)],
+    "center": [(320, 300), (400, 300), (480, 300)],
+    "top_left": [(130, 110), (230, 130), (150, 210)],
+    "top_right": [(670, 110), (570, 130), (650, 210)],
+    "bottom_left": [(130, 490), (230, 470), (150, 390)],
+    "bottom_right": [(670, 490), (570, 470), (650, 390)],
+}
+
 SIZE_PRESETS = {
     "tiny": (45, 45),
     "small": (80, 80),
@@ -69,9 +81,11 @@ class SceneExecutor:
     def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self.canvas_context = canvas_context or {}
         self.drawing_executor = DrawingExecutor(canvas_context)
+        self.anchor_usage: Dict[str, int] = {}
 
     def execute(self, plan: ScenePlan) -> List[Dict[str, Any]]:
         commands: List[Dict[str, Any]] = []
+        self.anchor_usage = {}
 
         if plan.background:
             commands.extend(self._create_background(plan))
@@ -196,7 +210,19 @@ class SceneExecutor:
         if position.anchor == "custom" and position.x is not None and position.y is not None:
             return position.x, position.y
 
-        return ANCHOR_POINTS.get(position.anchor, ANCHOR_POINTS["center"])
+        usage = self.anchor_usage.get(position.anchor, 0)
+        self.anchor_usage[position.anchor] = usage + 1
+
+        slots = ANCHOR_SLOTS.get(position.anchor)
+        if slots:
+            slot = slots[usage % len(slots)]
+            wrap = usage // len(slots)
+            if wrap == 0:
+                return slot
+            return slot[0] + wrap * 28, slot[1] + wrap * 18
+
+        base = ANCHOR_POINTS.get(position.anchor, ANCHOR_POINTS["center"])
+        return base[0] + usage * 28, base[1] + usage * 18
 
     def _resolve_size(self, scene_object: SceneObject) -> Tuple[float, float]:
         width, height = SIZE_PRESETS.get(scene_object.size.preset, SIZE_PRESETS["medium"])
