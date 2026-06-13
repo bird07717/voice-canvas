@@ -40,6 +40,7 @@ class VoiceCommandRequest(BaseModel):
     canvas_id: int
     text: str
     llm_config_id: Optional[int] = None
+    canvas_context: Optional[dict] = None
 
 
 class VoiceCommandResponse(BaseModel):
