@@ -153,22 +153,91 @@ export default function VoiceControl() {
     const state = useCanvasStore.getState()
 
     return {
-      objects: state.canvasObjects.slice(-30).map((obj: CanvasObject) => ({
-        id: obj.id,
-        type: obj.type,
-        kind: obj.params?.kind,
-        text: obj.params?.text,
-        x: obj.params?.x,
-        y: obj.params?.y,
-        width: obj.params?.width,
-        height: obj.params?.height,
-        radius: obj.params?.radius,
-      })),
+      objects: state.canvasObjects.slice(-30).map((obj: CanvasObject) => summarizeCanvasObject(obj)),
       lastCreatedObjectId: state.lastCreatedObjectId,
       lastModifiedObjectId: state.lastModifiedObjectId,
       selectedObjectId: state.selectedObjectId,
       recentCommands: state.recentCommands.slice(-10),
     }
+  }
+
+  const summarizeCanvasObject = (obj: CanvasObject) => {
+    const bounds = getObjectBounds(obj)
+
+    return {
+      id: obj.id,
+      type: obj.type,
+      kind: obj.params?.kind,
+      text: obj.params?.text,
+      x: obj.params?.x ?? bounds?.x,
+      y: obj.params?.y ?? bounds?.y,
+      width: obj.params?.width ?? bounds?.width,
+      height: obj.params?.height ?? bounds?.height,
+      radius: obj.params?.radius,
+    }
+  }
+
+  const getObjectBounds = (obj: CanvasObject) => {
+    const candidates = obj.children || [obj]
+    const boxes = candidates
+      .map((item) => getShapeBounds(item))
+      .filter(Boolean) as Array<{ x: number; y: number; width: number; height: number }>
+
+    if (boxes.length === 0) return null
+
+    const minX = Math.min(...boxes.map((box) => box.x))
+    const minY = Math.min(...boxes.map((box) => box.y))
+    const maxX = Math.max(...boxes.map((box) => box.x + box.width))
+    const maxY = Math.max(...boxes.map((box) => box.y + box.height))
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }
+  }
+
+  const getShapeBounds = (obj: CanvasObject) => {
+    const params = obj.params || {}
+
+    if (typeof params.x === 'number' && typeof params.y === 'number') {
+      if (typeof params.radius === 'number') {
+        return {
+          x: params.x - params.radius,
+          y: params.y - params.radius,
+          width: params.radius * 2,
+          height: params.radius * 2,
+        }
+      }
+
+      if (typeof params.width === 'number' && typeof params.height === 'number') {
+        return {
+          x: params.x,
+          y: params.y,
+          width: params.width,
+          height: params.height,
+        }
+      }
+    }
+
+    if (Array.isArray(params.points) && params.points.length >= 4) {
+      const xs = params.points.filter((_: number, index: number) => index % 2 === 0)
+      const ys = params.points.filter((_: number, index: number) => index % 2 === 1)
+      const minX = Math.min(...xs)
+      const minY = Math.min(...ys)
+      const maxX = Math.max(...xs)
+      const maxY = Math.max(...ys)
+
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      }
+    }
+
+    return null
   }
 
   const executeCommands = (commands: DrawCommand[]) => {
