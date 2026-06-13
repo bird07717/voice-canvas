@@ -1,0 +1,58 @@
+.baidu-asr-settings {
+  padding: 16px;
+}
+
+.test-result {
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.test-result.success {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #389e0d;
+}
+
+.test-result.error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+}
+
+.baidu-info {
+  margin-top: 16px;
+}
+
+.baidu-info h4 {
+  margin: 12px 0 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.baidu-info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.baidu-info li {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.8;
+}
+
+.baidu-info p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.baidu-info a {
+  color: #1890ff;
+  text-decoration: none;
+}
+
+.baidu-info a:hover {
+  text-decoration: underline;
+}
