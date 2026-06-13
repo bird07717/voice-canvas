@@ -72,6 +72,7 @@ class CreateObjectArgs(BaseModel):
 
 class EditObjectArgs(BaseModel):
     target: TargetSpec
+    operation: Optional[Literal["move", "resize", "recolor", "rotate", "restyle"]] = None
     changes: Dict[str, Any] = Field(default_factory=dict)
 
 

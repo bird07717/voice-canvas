@@ -44,10 +44,31 @@ export interface CanvasData {
 }
 
 // 语音命令请求
+export interface CanvasContextObject {
+  id: string
+  type: string
+  kind?: string
+  text?: string
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  radius?: number
+}
+
+export interface CanvasCommandContext {
+  objects: CanvasContextObject[]
+  lastCreatedObjectId?: string | null
+  lastModifiedObjectId?: string | null
+  selectedObjectId?: string | null
+  recentCommands: DrawCommand[]
+}
+
 export interface VoiceCommandRequest {
   canvas_id: number
   text: string
   llm_config_id?: number
+  canvas_context?: CanvasCommandContext
 }
 
 export type VoiceIntent =

@@ -52,10 +52,15 @@ DRAWING_TOOL_SCHEMAS: List[Dict[str, Any]] = [
                     "target": {
                         "$ref": "#/$defs/target"
                     },
+                    "operation": {
+                        "type": "string",
+                        "enum": ["move", "resize", "recolor", "rotate", "restyle"],
+                        "description": "High-level edit operation."
+                    },
                     "changes": {
                         "type": "object",
                         "additionalProperties": True,
-                        "description": "Requested changes, such as fill, stroke, position, size, scale, rotation, text."
+                        "description": "Requested changes. Supports fill, stroke, x, y, dx, dy, scale, scale_delta, width, height, rotation, text."
                     }
                 },
                 "$defs": {}

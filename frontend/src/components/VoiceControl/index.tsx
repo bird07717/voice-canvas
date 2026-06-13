@@ -6,7 +6,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { DrawCommand } from '@/types'
+import { CanvasCommandContext, CanvasObject, DrawCommand } from '@/types'
 import './VoiceControl.css'
 
 export default function VoiceControl() {
@@ -20,7 +20,20 @@ export default function VoiceControl() {
     setRecognitionType
   } = useVoiceStore()
   const { activeConfig, setIsProcessing, setChatHistory } = useLLMStore()
-  const { currentCanvasId, canvasObjects, addObject, updateObject, removeObject, clearCanvas, undo } = useCanvasStore()
+  const {
+    currentCanvasId,
+    canvasObjects,
+    lastCreatedObjectId,
+    lastModifiedObjectId,
+    selectedObjectId,
+    recentCommands,
+    addObject,
+    updateObject,
+    removeObject,
+    clearCanvas,
+    undo,
+    recordCommands,
+  } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
   const lastFinalTimeRef = useRef(0)
@@ -107,6 +120,7 @@ export default function VoiceControl() {
         canvas_id: currentCanvasId,
         text: text.trim(),
         llm_config_id: activeConfig?.id,
+        canvas_context: buildCanvasContext(),
       })
 
       if (response.intent === 'ignore') {
@@ -127,6 +141,7 @@ export default function VoiceControl() {
       setStatus('drawing')
       if (response.commands.length > 0) {
         executeCommands(response.commands)
+        recordCommands(response.commands)
       }
       if (response.response) {
         message.success(response.response)
@@ -138,6 +153,24 @@ export default function VoiceControl() {
       setIsProcessing(false)
     }
   }
+
+  const buildCanvasContext = (): CanvasCommandContext => ({
+    objects: canvasObjects.slice(-30).map((obj: CanvasObject) => ({
+      id: obj.id,
+      type: obj.type,
+      kind: obj.params?.kind,
+      text: obj.params?.text,
+      x: obj.params?.x,
+      y: obj.params?.y,
+      width: obj.params?.width,
+      height: obj.params?.height,
+      radius: obj.params?.radius,
+    })),
+    lastCreatedObjectId,
+    lastModifiedObjectId,
+    selectedObjectId,
+    recentCommands: recentCommands.slice(-10),
+  })
 
   const executeCommands = (commands: DrawCommand[]) => {
     let lastCreatedId: string | null = null
@@ -199,7 +232,14 @@ export default function VoiceControl() {
 
   const resolveCommandTarget = (target: string, lastCreatedId: string | null) => {
     if (target === '__last__') {
-      return lastCreatedId || canvasObjects[canvasObjects.length - 1]?.id || null
+      return (
+        lastCreatedId ||
+        selectedObjectId ||
+        lastModifiedObjectId ||
+        lastCreatedObjectId ||
+        canvasObjects[canvasObjects.length - 1]?.id ||
+        null
+      )
     }
 
     if (target.startsWith('__kind__:')) {
