@@ -412,8 +412,14 @@ class DrawingExecutor:
             "车": "car",
             "山": "mountain",
             "草": "grass",
+            "草地": "grass",
             "路": "road",
-            "河": "river"
+            "道路": "road",
+            "小路": "road",
+            "河": "river",
+            "河流": "river",
+            "海": "river",
+            "海面": "river",
         }
         return aliases.get(kind, kind)
 

@@ -260,7 +260,7 @@ export function matchFastCommand(
 
   const target = resolveSpokenTarget(text, context)
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
+  if (/(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -282,7 +282,7 @@ export function matchFastCommand(
     ])
   }
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|放|弄)?(大|大一点|大一些)|^放大(它|这个|选中)?$|^(大一点|再大一点)$/.test(text)) {
+  if (/(变大|放大|弄大|大一点|大一些|再大一点)/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -296,7 +296,7 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  if (/^(把|将)?(它|这个|选中|当前)?(变|缩|弄)?(小|小一点|小一些)|^缩小(它|这个|选中)?$|^(小一点|再小一点)$/.test(text)) {
+  if (/(变小|缩小|弄小|小一点|小一些|再小一点)/.test(text)) {
     if (!target) {
       return {
         matched: true,
@@ -351,6 +351,27 @@ export function matchFastCommand(
 
     return commandResult(cornerMatch[1], [
       { action: 'move', target, params: { x: cornerMatch[2], y: cornerMatch[3] } },
+    ] as DrawCommand[])
+  }
+
+  const sideMap: Array<[RegExp, string, number, number]> = [
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(左边|左侧)$/, '移动到左边', 130, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(右边|右侧)$/, '移动到右边', 670, 300],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(上面|顶部)$/, '移动到上方', 400, 100],
+    [/(移动|移到|移动到|放到|放在|挪到|挪去)?(下面|底部)$/, '移动到底部', 400, 500],
+  ]
+  const sideMatch = sideMap.find(([pattern]) => pattern.test(text))
+  if (sideMatch) {
+    if (!target) {
+      return {
+        matched: true,
+        interpretation: sideMatch[1],
+        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+      }
+    }
+
+    return commandResult(sideMatch[1], [
+      { action: 'move', target, params: { x: sideMatch[2], y: sideMatch[3] } },
     ] as DrawCommand[])
   }
 
