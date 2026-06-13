@@ -36,8 +36,8 @@ export default function Login() {
       <div className="login-content">
         <div className="login-product-preview" aria-hidden="true">
           <div className="preview-copy">
-            <span>Voice to visual canvas</span>
-            <strong>把语音灵感变成可编辑画布</strong>
+            <span>Voice controlled drawing</span>
+            <strong>说出想法，画布自动绘制</strong>
           </div>
           <div className="preview-canvas">
             <div className="preview-toolbar">
@@ -45,43 +45,50 @@ export default function Login() {
               <span />
               <span />
             </div>
+            <div className="preview-bubbles">
+              <div className="preview-bubble preview-bubble-user">
+                语音：画一个红色圆
+              </div>
+              <div className="preview-bubble preview-bubble-ai">
+                正在绘制到画布
+              </div>
+            </div>
             <svg className="preview-drawing" viewBox="0 0 520 330">
               <path
                 className="preview-curve"
-                d="M52 238C112 178 160 258 226 202S340 142 456 198"
+                d="M74 238C134 176 198 245 258 190S348 144 440 204"
               />
               <rect
                 className="preview-shape preview-rect"
-                x="72"
-                y="88"
-                width="104"
-                height="72"
+                x="88"
+                y="118"
+                width="92"
+                height="64"
                 rx="16"
               />
               <circle
                 className="preview-shape preview-circle"
-                cx="406"
-                cy="132"
-                r="46"
+                cx="390"
+                cy="158"
+                r="48"
               />
               <path
                 className="preview-shape preview-star"
-                d="M230 86l12 27 30 3-22 21 6 30-26-15-26 15 6-30-22-21 30-3 12-27Z"
+                d="M248 104l11 25 28 3-21 19 6 27-24-14-24 14 6-27-21-19 28-3 11-25Z"
               />
               <rect
                 className="preview-selection"
-                x="360"
-                y="86"
+                x="342"
+                y="110"
                 width="92"
                 height="92"
                 rx="8"
               />
-              <circle className="preview-handle" cx="360" cy="86" r="4.5" />
-              <circle className="preview-handle" cx="452" cy="86" r="4.5" />
-              <circle className="preview-handle" cx="452" cy="178" r="4.5" />
-              <circle className="preview-handle" cx="360" cy="178" r="4.5" />
+              <circle className="preview-handle" cx="342" cy="110" r="4.5" />
+              <circle className="preview-handle" cx="434" cy="110" r="4.5" />
+              <circle className="preview-handle" cx="434" cy="202" r="4.5" />
+              <circle className="preview-handle" cx="342" cy="202" r="4.5" />
             </svg>
-            <div className="preview-command">画一个红色圆</div>
             <div className="preview-wave">
               <span />
               <span />
@@ -99,32 +106,41 @@ export default function Login() {
               <div className="login-logo" aria-hidden="true">
                 <svg viewBox="0 0 64 64" role="img">
                   <path
-                    d="M25 13a7 7 0 0 1 14 0v13a7 7 0 0 1-14 0V13Z"
+                    d="M25 12a7 7 0 0 1 14 0v14a7 7 0 0 1-14 0V12Z"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3.5"
                     strokeLinecap="round"
                   />
                   <path
-                    d="M18 24a14 14 0 0 0 28 0M32 38v7M22 51h20"
+                    d="M18 24a14 14 0 0 0 28 0M32 38v7"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3.5"
                     strokeLinecap="round"
                   />
                   <path
-                    d="M39 44 51 32c2.4-2.4 6 1.2 3.6 3.6L42.5 47.7 36 50.5 39 44Z"
-                    fill="rgba(255,255,255,0.18)"
+                    d="M22 46h20"
+                    fill="none"
                     stroke="currentColor"
-                    strokeWidth="3"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M17 53c8-8 17-8 25-1 3 2.6 6 2.5 9-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  <path
-                    d="M13 45c4.5-5.6 10-5.6 14.5 0s10 5.6 14.5 0"
-                    fill="none"
+                  <circle
+                    cx="51"
+                    cy="51.5"
+                    r="3.8"
+                    fill="rgba(255,255,255,0.28)"
                     stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
+                    strokeWidth="2.4"
                   />
                 </svg>
               </div>
