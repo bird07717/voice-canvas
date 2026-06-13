@@ -1,25 +1,10 @@
-import { apiService } from './api'
-
 // 百度语音识别相关类型定义
+const DEFAULT_BAIDU_APP_ID = '123697514'
+
 export interface BaiduVoiceConfig {
   appId?: string
   apiKey: string
   secretKey: string
-}
-
-export interface BaiduTokenResponse {
-  access_token: string
-  expires_in: number
-  error?: string
-  error_description?: string
-}
-
-export interface BaiduASRResponse {
-  err_no: number
-  err_msg: string
-  corpus_no?: string
-  sn: string
-  result?: string[]
 }
 
 // 语音识别服务类
@@ -28,13 +13,13 @@ class VoiceService {
   private isInitialized = false
   private baiduConfig: BaiduVoiceConfig | null = null
   private keepListening = false
+  private realtimeSocket: WebSocket | null = null
+  private realtimeAudioSource: MediaStreamAudioSourceNode | null = null
+  private realtimePcmQueue = new Uint8Array(0)
+  private readonly realtimeFrameBytes = 5120
   private audioContext: AudioContext | null = null
   private audioProcessor: ScriptProcessorNode | null = null
   private audioStream: MediaStream | null = null
-  private baiduBuffers: Float32Array[] = []
-  private baiduRecordingTimer: number | null = null
-  private baiduOnResult: ((text: string, isFinal: boolean) => void) | null = null
-  private baiduOnError: ((error: any) => void) | null = null
   private useBaidu: boolean = false
 
   /**
@@ -42,72 +27,36 @@ class VoiceService {
    * @param config 百度语音配置（可选）
    */
   async initialize(config?: BaiduVoiceConfig) {
-    this.baiduConfig = config || null
+    this.baiduConfig = config
+      ? { ...config, appId: config.appId || DEFAULT_BAIDU_APP_ID }
+      : null
 
-    // 实时连续监听优先使用浏览器 Web Speech。百度短语音是录完再传，不适合实时交互。
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      this.recognition = new SpeechRecognition()
-      this.recognition.continuous = true
-      this.recognition.interimResults = true
-      this.recognition.lang = 'zh-CN'
-      this.useBaidu = false
+    if (this.baiduConfig?.appId && this.baiduConfig.apiKey) {
+      this.useBaidu = true
       this.isInitialized = true
-      console.log('使用浏览器Web Speech API实时识别')
+      console.log('使用百度实时语音识别')
       return true
     }
 
-    if (config?.apiKey && config?.secretKey) {
-      // 无实时识别能力时，退回百度短语音。
-      this.useBaidu = true
-
-      try {
-        await apiService.testBaiduASR({
-          api_key: config.apiKey,
-          secret_key: config.secretKey,
-        })
-        console.log('百度语音识别初始化成功')
-        this.isInitialized = true
-        return true
-      } catch (error) {
-        console.warn('百度语音识别初始化失败，降级到Web Speech API', error)
-        this.useBaidu = false
-      }
+    // 降级到浏览器原生 Web Speech API
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      this.setupWebSpeechRecognition()
+      console.log('使用浏览器Web Speech API')
+      return true
     }
 
     return false
   }
 
-  /**
-   * 百度语音识别
-   */
-  private async recognizeWithBaidu(wavBuffer: ArrayBuffer): Promise<string> {
-    if (!this.baiduConfig) {
-      throw new Error('百度配置未设置')
-    }
-
-    // 将WAV音频转为base64
-    const arrayBuffer = wavBuffer
-    const base64Audio = this.arrayBufferToBase64(arrayBuffer)
-
-    try {
-      const data = await apiService.recognizeWithBaidu({
-        api_key: this.baiduConfig.apiKey,
-        secret_key: this.baiduConfig.secretKey,
-        format: 'wav',
-        rate: 16000,
-        channel: 1,
-        cuid: this.generateCUID(),
-        dev_pid: 1537,
-        speech: base64Audio,
-        len: arrayBuffer.byteLength,
-      })
-      return data.text
-    } catch (error) {
-      console.error('百度ASR调用失败:', error)
-      throw error
-    }
+  private setupWebSpeechRecognition() {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    this.recognition = new SpeechRecognition()
+    this.recognition.continuous = true
+    this.recognition.interimResults = true
+    this.recognition.lang = 'zh-CN'
+    this.useBaidu = false
+    this.isInitialized = true
   }
 
   /**
@@ -126,58 +75,209 @@ class VoiceService {
     }
 
     if (this.useBaidu) {
-      // 使用百度ASR
-      await this.startBaiduRecording(onResult, onError)
+      await this.startBaiduRealtimeRecognition(onResult, onError)
     } else {
       // 使用Web Speech API
       await this.startWebSpeechRecognition(onResult, onError)
     }
   }
 
-  /**
-   * 启动百度录音
-   */
-  private async startBaiduRecording(
+  private async startBaiduRealtimeRecognition(
     onResult: (text: string, isFinal: boolean) => void,
     onError?: (error: any) => void
   ) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
+    const config = this.baiduConfig
+    if (!config?.appId || !config.apiKey) {
+      this.fallbackToWebSpeech(onResult, onError)
+      return
+    }
+
+    const appId = Number(config.appId)
+    if (!Number.isFinite(appId)) {
+      onError?.(new Error('百度AppID必须是数字'))
+      return
+    }
+
+    this.keepListening = true
+    this.stopBaiduRealtimeRecognition('cancel')
+
+    const sn = this.generateSN()
+    const socket = new WebSocket(`wss://vop.baidu.com/realtime_asr?sn=${sn}`)
+    this.realtimeSocket = socket
+
+    socket.onmessage = (event) => {
+      this.handleBaiduRealtimeMessage(event.data, onResult, onError)
+    }
+
+    socket.onerror = () => {
+      console.warn('百度实时ASR连接失败，降级到浏览器识别')
+      this.stopBaiduRealtimeRecognition('cancel')
+      this.fallbackToWebSpeech(onResult, onError)
+    }
+
+    socket.onclose = () => {
+      this.realtimeSocket = null
+      this.stopRealtimeAudio()
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(new Error('百度实时ASR连接超时'))
+      }, 8000)
+
+      socket.onopen = async () => {
+        window.clearTimeout(timeout)
+        try {
+          socket.send(JSON.stringify({
+            type: 'START',
+            data: {
+              appid: appId,
+              appkey: config.apiKey,
+              dev_pid: 15372,
+              cuid: this.generateCUID(),
+              format: 'pcm',
+              sample: 16000
+            }
+          }))
+          await this.startRealtimeAudio(socket)
+          resolve()
+        } catch (error) {
+          reject(error)
         }
-      })
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      const audioContext = new AudioContextClass()
-      const source = audioContext.createMediaStreamSource(stream)
-      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      }
+    }).catch((error) => {
+      console.warn('百度实时ASR启动失败，降级到浏览器识别:', error)
+      this.stopBaiduRealtimeRecognition('cancel')
+      this.fallbackToWebSpeech(onResult, onError)
+    })
+  }
 
-      this.audioStream = stream
-      this.audioContext = audioContext
-      this.audioProcessor = processor
-      this.baiduBuffers = []
-      this.baiduOnResult = onResult
-      this.baiduOnError = onError || null
+  private handleBaiduRealtimeMessage(
+    data: any,
+    onResult: (text: string, isFinal: boolean) => void,
+    onError?: (error: any) => void
+  ) {
+    if (typeof data !== 'string') return
 
-      processor.onaudioprocess = (event) => {
-        const input = event.inputBuffer.getChannelData(0)
-        this.baiduBuffers.push(new Float32Array(input))
+    try {
+      const message = JSON.parse(data)
+      if (message.type === 'HEARTBEAT') return
+
+      if (message.err_no && message.err_no !== 0) {
+        console.warn('百度实时ASR返回错误:', message)
+        if (message.err_no === -3004) {
+          onError?.(new Error(message.err_msg || '百度实时ASR鉴权失败'))
+        }
+        return
       }
 
-      source.connect(processor)
-      processor.connect(audioContext.destination)
+      if (message.type === 'MID_TEXT' && message.result) {
+        onResult(message.result, false)
+      }
 
-      // 百度ASR支持最长60秒，这里设置为55秒自动停止
-      this.baiduRecordingTimer = window.setTimeout(() => {
-        this.stopBaiduRecording()
-      }, 55000)
-
+      if (message.type === 'FIN_TEXT' && message.result) {
+        onResult(message.result, true)
+      }
     } catch (error) {
-      console.error('获取麦克风权限失败:', error)
-      onError?.(error)
+      console.warn('解析百度实时ASR消息失败:', error)
     }
+  }
+
+  private async startRealtimeAudio(socket: WebSocket) {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+      }
+    })
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    const audioContext = new AudioContextClass()
+    const source = audioContext.createMediaStreamSource(stream)
+    const processor = audioContext.createScriptProcessor(4096, 1, 1)
+    const mute = audioContext.createGain()
+
+    mute.gain.value = 0
+    this.audioStream = stream
+    this.audioContext = audioContext
+    this.audioProcessor = processor
+    this.realtimeAudioSource = source
+    this.realtimePcmQueue = new Uint8Array(0)
+
+    processor.onaudioprocess = (event) => {
+      if (!this.keepListening || socket.readyState !== WebSocket.OPEN) return
+
+      const input = event.inputBuffer.getChannelData(0)
+      const downsampled = this.downsampleBuffer(input, audioContext.sampleRate, 16000)
+      const pcm = this.floatTo16BitPCM(downsampled)
+      this.enqueueRealtimePcm(socket, pcm)
+    }
+
+    source.connect(processor)
+    processor.connect(mute)
+    mute.connect(audioContext.destination)
+  }
+
+  private enqueueRealtimePcm(socket: WebSocket, pcm: Uint8Array) {
+    const merged = new Uint8Array(this.realtimePcmQueue.length + pcm.length)
+    merged.set(this.realtimePcmQueue, 0)
+    merged.set(pcm, this.realtimePcmQueue.length)
+    this.realtimePcmQueue = merged
+
+    while (this.realtimePcmQueue.length >= this.realtimeFrameBytes) {
+      const chunk = this.realtimePcmQueue.slice(0, this.realtimeFrameBytes)
+      this.realtimePcmQueue = this.realtimePcmQueue.slice(this.realtimeFrameBytes)
+      socket.send(chunk.buffer)
+    }
+  }
+
+  private stopBaiduRealtimeRecognition(mode: 'finish' | 'cancel') {
+    this.stopRealtimeAudio()
+
+    if (this.realtimeSocket && this.realtimeSocket.readyState === WebSocket.OPEN) {
+      if (this.realtimePcmQueue.length > 0 && mode === 'finish') {
+        this.realtimeSocket.send(this.realtimePcmQueue.buffer)
+      }
+      this.realtimeSocket.send(JSON.stringify({ type: mode === 'finish' ? 'FINISH' : 'CANCEL' }))
+      if (mode === 'cancel') {
+        this.realtimeSocket.close()
+      }
+    }
+
+    this.realtimePcmQueue = new Uint8Array(0)
+  }
+
+  private stopRealtimeAudio() {
+    if (this.audioProcessor) {
+      this.audioProcessor.disconnect()
+    }
+    if (this.realtimeAudioSource) {
+      this.realtimeAudioSource.disconnect()
+    }
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach(track => track.stop())
+    }
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close().catch(() => undefined)
+    }
+
+    this.audioContext = null
+    this.audioProcessor = null
+    this.audioStream = null
+    this.realtimeAudioSource = null
+  }
+
+  private fallbackToWebSpeech(
+    onResult: (text: string, isFinal: boolean) => void,
+    onError?: (error: any) => void
+  ) {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      this.setupWebSpeechRecognition()
+      this.startWebSpeechRecognition(onResult, onError)
+      return
+    }
+
+    onError?.(new Error('百度实时ASR不可用，且浏览器不支持Web Speech降级'))
   }
 
   /**
@@ -242,7 +342,7 @@ class VoiceService {
   stopListening() {
     this.keepListening = false
     if (this.useBaidu) {
-      this.stopBaiduRecording()
+      this.stopBaiduRealtimeRecognition('finish')
     } else {
       // 停止Web Speech
       if (this.recognition) {
@@ -256,9 +356,9 @@ class VoiceService {
    */
   isSupported(): boolean {
     return (
+      ('WebSocket' in window && 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices) ||
       'webkitSpeechRecognition' in window ||
-      'SpeechRecognition' in window ||
-      'MediaRecorder' in window
+      'SpeechRecognition' in window
     )
   }
 
@@ -268,82 +368,6 @@ class VoiceService {
   getRecognitionType(): 'baidu' | 'webspeech' | 'none' {
     if (!this.isInitialized) return 'none'
     return this.useBaidu ? 'baidu' : 'webspeech'
-  }
-
-  /**
-   * ArrayBuffer转Base64
-   */
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    let binary = ''
-    const bytes = new Uint8Array(buffer)
-    const len = bytes.byteLength
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
-  }
-
-  /**
-   * 停止百度录音并提交识别
-   */
-  private async stopBaiduRecording() {
-    if (!this.audioContext || !this.audioProcessor || !this.audioStream) {
-      return
-    }
-
-    if (this.baiduRecordingTimer) {
-      window.clearTimeout(this.baiduRecordingTimer)
-      this.baiduRecordingTimer = null
-    }
-
-    const audioContext = this.audioContext
-    const processor = this.audioProcessor
-    const stream = this.audioStream
-    const buffers = this.baiduBuffers
-    const onResult = this.baiduOnResult
-    const onError = this.baiduOnError
-
-    processor.disconnect()
-    stream.getTracks().forEach(track => track.stop())
-    this.audioContext = null
-    this.audioProcessor = null
-    this.audioStream = null
-    this.baiduBuffers = []
-    this.baiduOnResult = null
-    this.baiduOnError = null
-
-    try {
-      const samples = this.mergeAudioBuffers(buffers)
-      const wavBuffer = this.encodeWav(
-        this.downsampleBuffer(samples, audioContext.sampleRate, 16000),
-        16000
-      )
-      await audioContext.close()
-
-      const text = await this.recognizeWithBaidu(wavBuffer)
-      onResult?.(text, true)
-    } catch (error) {
-      console.error('百度ASR识别失败:', error)
-      onError?.(error)
-      try {
-        await audioContext.close()
-      } catch {
-        // ignore close errors
-      }
-    }
-  }
-
-  private mergeAudioBuffers(buffers: Float32Array[]): Float32Array {
-    const totalLength = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
-    const result = new Float32Array(totalLength)
-    let offset = 0
-
-    buffers.forEach((buffer) => {
-      result.set(buffer, offset)
-      offset += buffer.length
-    })
-
-    return result
   }
 
   private downsampleBuffer(buffer: Float32Array, sourceRate: number, targetRate: number): Float32Array {
@@ -372,40 +396,16 @@ class VoiceService {
     return result
   }
 
-  private encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
-    const bytesPerSample = 2
-    const dataLength = samples.length * bytesPerSample
-    const buffer = new ArrayBuffer(44 + dataLength)
+  private floatTo16BitPCM(samples: Float32Array): Uint8Array {
+    const buffer = new ArrayBuffer(samples.length * 2)
     const view = new DataView(buffer)
 
-    this.writeAscii(view, 0, 'RIFF')
-    view.setUint32(4, 36 + dataLength, true)
-    this.writeAscii(view, 8, 'WAVE')
-    this.writeAscii(view, 12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, 1, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * bytesPerSample, true)
-    view.setUint16(32, bytesPerSample, true)
-    view.setUint16(34, 16, true)
-    this.writeAscii(view, 36, 'data')
-    view.setUint32(40, dataLength, true)
-
-    let offset = 44
     for (let i = 0; i < samples.length; i++) {
       const sample = Math.max(-1, Math.min(1, samples[i]))
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
-      offset += 2
+      view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
     }
 
-    return buffer
-  }
-
-  private writeAscii(view: DataView, offset: number, value: string) {
-    for (let i = 0; i < value.length; i++) {
-      view.setUint8(offset + i, value.charCodeAt(i))
-    }
+    return new Uint8Array(buffer)
   }
 
   /**
@@ -418,6 +418,13 @@ class VoiceService {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     const cuid = btoa(`${userAgent}-${screenResolution}-${timezone}`).substring(0, 60)
     return cuid
+  }
+
+  private generateSN(): string {
+    if (crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
 }
 

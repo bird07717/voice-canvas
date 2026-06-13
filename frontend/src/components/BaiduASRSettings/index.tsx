@@ -5,6 +5,8 @@ import { useVoiceStore } from '@/stores/voiceStore'
 import { apiService } from '@/services/api'
 import './BaiduASRSettings.css'
 
+const DEFAULT_BAIDU_APP_ID = '123697514'
+
 export default function BaiduASRSettings() {
   const { baiduConfig, setBaiduConfig } = useVoiceStore()
   const [form] = Form.useForm()
@@ -40,10 +42,11 @@ export default function BaiduASRSettings() {
     try {
       const values = await form.validateFields()
       setBaiduConfig({
+        appId: values.appId,
         apiKey: values.apiKey,
         secretKey: values.secretKey
       })
-      message.success('保存成功！下次使用语音识别将使用百度ASR')
+      message.success('保存成功！下次使用语音识别将优先使用百度实时ASR')
     } catch (error) {
       message.error('保存失败，请检查输入')
     }
@@ -61,8 +64,19 @@ export default function BaiduASRSettings() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={baiduConfig || undefined}
+          initialValues={{ appId: DEFAULT_BAIDU_APP_ID, ...(baiduConfig || {}) }}
         >
+          <Form.Item
+            name="appId"
+            label="AppID"
+            rules={[{ required: true, message: '请输入AppID' }]}
+          >
+            <Input
+              placeholder="请输入百度应用AppID"
+              disabled={!baiduConfig && baiduConfig !== null}
+            />
+          </Form.Item>
+
           <Form.Item
             name="apiKey"
             label="API Key"
@@ -124,9 +138,9 @@ export default function BaiduASRSettings() {
         <div className="baidu-info">
           <h4>说明：</h4>
           <ul>
-            <li>配置百度ASR后，语音识别准确率更高</li>
-            <li>如未配置或配置失败，将自动降级到浏览器识别</li>
-            <li>API Key和Secret Key可在百度智能云控制台获取</li>
+            <li>配置百度ASR后，将优先使用百度实时语音识别</li>
+            <li>如未配置或实时连接失败，将自动降级到浏览器识别</li>
+            <li>AppID、API Key和Secret Key可在百度智能云控制台获取</li>
             <li>获取地址：<a href="https://console.bce.baidu.com/ai/#/ai/speech/overview/index" target="_blank" rel="noopener noreferrer">百度AI开放平台</a></li>
           </ul>
 

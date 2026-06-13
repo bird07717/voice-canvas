@@ -82,6 +82,7 @@ export default function VoiceControl() {
           setStatus('idle')
         }
       )
+      setRecognitionType(voiceService.getRecognitionType())
     } catch (error: any) {
       message.error('启动语音识别失败: ' + (error.message || error))
       setStatus('idle')
