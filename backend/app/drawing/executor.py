@@ -200,7 +200,10 @@ class DrawingExecutor:
             "action": "create",
             "type": shape_type,
             "id": object_id,
-            "params": params
+            "params": {
+                **params,
+                "kind": kind
+            }
         }
 
     def _create_template(self, kind: str, args: CreateObjectArgs) -> Dict[str, Any]:
@@ -214,7 +217,7 @@ class DrawingExecutor:
             "action": "create",
             "type": "group",
             "id": self._next_id(),
-            "params": {},
+            "params": {"kind": kind},
             "children": children
         }
 
