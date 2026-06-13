@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import Konva from 'konva'
 
+const CANVAS_WIDTH = 800
+const CANVAS_HEIGHT = 600
+
 type Bounds = {
   x: number
   y: number
@@ -176,6 +179,46 @@ const transformObject = (obj: any, transform: TransformOptions): any => {
   return { ...obj, params }
 }
 
+const getCanvasClampDelta = (bounds: Bounds) => {
+  let dx = 0
+  let dy = 0
+
+  if (bounds.width >= CANVAS_WIDTH) {
+    dx = -bounds.x
+  } else if (bounds.x < 0) {
+    dx = -bounds.x
+  } else if (bounds.x + bounds.width > CANVAS_WIDTH) {
+    dx = CANVAS_WIDTH - (bounds.x + bounds.width)
+  }
+
+  if (bounds.height >= CANVAS_HEIGHT) {
+    dy = -bounds.y
+  } else if (bounds.y < 0) {
+    dy = -bounds.y
+  } else if (bounds.y + bounds.height > CANVAS_HEIGHT) {
+    dy = CANVAS_HEIGHT - (bounds.y + bounds.height)
+  }
+
+  return { dx, dy }
+}
+
+const clampObjectToCanvas = (obj: any): any => {
+  const bounds = getObjectBounds(obj)
+  if (!bounds) return obj
+
+  const { dx, dy } = getCanvasClampDelta(bounds)
+  if (dx === 0 && dy === 0) return obj
+
+  return transformObject(obj, {
+    dx,
+    dy,
+    scaleX: 1,
+    scaleY: 1,
+    originX: bounds.x,
+    originY: bounds.y,
+  })
+}
+
 const getStyleUpdates = (updates: any) => {
   const styleUpdates: any = {}
   ;['fill', 'stroke', 'strokeWidth', 'opacity'].forEach((key) => {
@@ -274,11 +317,11 @@ const updateGroupObject = (obj: any, updates: any): any => {
 
   const nextGroupParams = sanitizeGroupParams({ ...groupParams, ...styleUpdates })
 
-  return {
+  return clampObjectToCanvas({
     ...obj,
     params: nextGroupParams,
     children,
-  }
+  })
 }
 
 const updateCanvasObject = (obj: any, id: string, updates: any): any => {
@@ -290,7 +333,7 @@ const updateCanvasObject = (obj: any, id: string, updates: any): any => {
     return updateGroupObject(obj, definedUpdates)
   }
 
-  return { ...obj, params: { ...obj.params, ...definedUpdates } }
+  return clampObjectToCanvas({ ...obj, params: { ...obj.params, ...definedUpdates } })
 }
 
 interface CanvasState {
