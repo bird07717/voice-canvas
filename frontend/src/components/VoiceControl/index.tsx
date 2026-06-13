@@ -20,6 +20,8 @@ type CommandExecutionResult = {
   message: string
 }
 
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const {
     isListening,
@@ -245,7 +247,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
       setStatus('drawing')
       if (response.commands.length > 0) {
-        const result = executeCommands(response.commands)
+        const result = response.scene
+          ? await executeSceneCommands(response.commands)
+          : executeCommands(response.commands)
         if (!result.success) {
           setStatus('error')
           setErrorMessage(result.message)
@@ -269,6 +273,27 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       setExecutionMessage('')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const executeSceneCommands = async (commands: DrawCommand[]): Promise<CommandExecutionResult> => {
+    let successCount = 0
+
+    for (const [index, command] of commands.entries()) {
+      setExecutionMessage(`正在绘制场景：${index + 1} / ${commands.length}`)
+      await wait(120)
+      const result = executeCommands([command])
+      if (!result.success) {
+        return result
+      }
+      successCount += 1
+    }
+
+    return {
+      success: successCount > 0,
+      message: successCount > 0
+        ? `已完成：执行 ${successCount} 个命令`
+        : '没有可执行的场景命令',
     }
   }
 
