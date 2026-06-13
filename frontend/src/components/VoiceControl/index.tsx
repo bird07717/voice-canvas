@@ -38,7 +38,7 @@ export default function VoiceControl() {
 
   const handleStartVoice = async () => {
     if (!activeConfig) {
-      message.warning('请先配置LLM模型')
+      message.warning('请先在首页设置中配置LLM模型')
       return
     }
 
@@ -168,7 +168,7 @@ export default function VoiceControl() {
 
   return (
     <div className="voice-control">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div className="voice-control-header">
         <h3>语音控制</h3>
         {getRecognitionTypeLabel()}
       </div>
@@ -215,15 +215,24 @@ export default function VoiceControl() {
             <li>"清空画布"</li>
             <li>"撤销"</li>
           </ul>
-          {recognitionType === 'webspeech' && (
-            <div style={{ marginTop: 12, padding: 8, background: '#fff7e6', borderRadius: 4 }}>
-              <p style={{ margin: 0, fontSize: 12, color: '#fa8c16' }}>
-                ℹ️ 当前使用浏览器识别（降级方案），识别准确率可能较低。
-                {baiduConfig ? '百度ASR初始化失败，请检查配置。' : ''}
-              </p>
-            </div>
-          )}
         </div>
+
+        {recognitionType === 'webspeech' && (
+          <div className="voice-status-info">
+            <p>
+              ℹ️ 当前使用浏览器识别（降级方案），识别准确率可能较低。
+              {!baiduConfig && '建议在首页设置中配置百度ASR以获得更好的识别效果。'}
+            </p>
+          </div>
+        )}
+
+        {!activeConfig && (
+          <div className="voice-status-info">
+            <p>
+              ⚠️ 未配置LLM模型，请先在首页设置中配置LLM。
+            </p>
+          </div>
+        )}
       </Space>
     </div>
   )

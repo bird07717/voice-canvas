@@ -10,6 +10,7 @@ import {
   Modal,
   Empty,
   Spin,
+  Tabs,
 } from 'antd'
 import {
   PlusOutlined,
@@ -21,15 +22,18 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { apiService } from '@/services/api'
 import { CanvasData } from '@/types'
+import LLMSettings from '@/components/LLMSettings'
+import BaiduASRSettings from '@/components/BaiduASRSettings'
 import './Home.css'
 
-const { Header, Content } = Layout
+const { Header, Content, Sider } = Layout
 
 export default function Home() {
   const navigate = useNavigate()
   const { username, clearAuth } = useAuthStore()
   const [canvases, setCanvases] = useState<CanvasData[]>([])
   const [loading, setLoading] = useState(true)
+  const [settingsVisible, setSettingsVisible] = useState(false)
 
   useEffect(() => {
     loadCanvases()
@@ -101,7 +105,7 @@ export default function Home() {
         </div>
         <div className="header-right">
           <span className="username">欢迎，{username}</span>
-          <Button icon={<SettingOutlined />} onClick={() => navigate('/settings')}>
+          <Button icon={<SettingOutlined />} onClick={() => setSettingsVisible(true)}>
             设置
           </Button>
           <Button icon={<LogoutOutlined />} onClick={handleLogout}>
@@ -110,73 +114,100 @@ export default function Home() {
         </div>
       </Header>
 
-      <Content className="home-content">
-        <div className="content-header">
-          <h2>我的画布</h2>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreateCanvas}
-            size="large"
-          >
-            新建画布
-          </Button>
-        </div>
-
-        {loading ? (
-          <div className="loading-container">
-            <Spin size="large" />
+      <Layout>
+        <Content className="home-content">
+          <div className="content-header">
+            <h2>我的画布</h2>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreateCanvas}
+              size="large"
+            >
+              新建画布
+            </Button>
           </div>
-        ) : canvases.length === 0 ? (
-          <Empty
-            description="还没有画布，点击新建画布开始创作"
-            style={{ marginTop: 100 }}
-          />
-        ) : (
-          <Row gutter={[24, 24]} className="canvas-grid">
-            {canvases.map((canvas) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={canvas.id}>
-                <Card
-                  hoverable
-                  className="canvas-card"
-                  onClick={() => navigate(`/canvas/${canvas.id}`)}
-                  cover={
-                    <div className="canvas-thumbnail">
-                      {canvas.thumbnail_url ? (
-                        <img src={canvas.thumbnail_url} alt={canvas.title} />
-                      ) : (
-                        <div className="thumbnail-placeholder">
-                          <EditOutlined style={{ fontSize: 48 }} />
-                        </div>
-                      )}
-                    </div>
-                  }
-                  actions={[
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={(e) => handleDeleteCanvas(canvas.id, e)}
-                    >
-                      删除
-                    </Button>,
-                  ]}
-                >
-                  <Card.Meta
-                    title={canvas.title}
-                    description={
-                      <>
-                        <p>创建时间: {new Date(canvas.created_at).toLocaleDateString()}</p>
-                        <p>更新时间: {new Date(canvas.updated_at).toLocaleDateString()}</p>
-                      </>
+
+          {loading ? (
+            <div className="loading-container">
+              <Spin size="large" />
+            </div>
+          ) : canvases.length === 0 ? (
+            <Empty
+              description="还没有画布，点击新建画布开始创作"
+              style={{ marginTop: 100 }}
+            />
+          ) : (
+            <Row gutter={[24, 24]} className="canvas-grid">
+              {canvases.map((canvas) => (
+                <Col xs={24} sm={12} md={8} lg={6} key={canvas.id}>
+                  <Card
+                    hoverable
+                    className="canvas-card"
+                    onClick={() => navigate(`/canvas/${canvas.id}`)}
+                    cover={
+                      <div className="canvas-thumbnail">
+                        {canvas.thumbnail_url ? (
+                          <img src={canvas.thumbnail_url} alt={canvas.title} />
+                        ) : (
+                          <div className="thumbnail-placeholder">
+                            <EditOutlined style={{ fontSize: 48 }} />
+                          </div>
+                        )}
+                      </div>
                     }
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        )}
-      </Content>
+                    actions={[
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => handleDeleteCanvas(canvas.id, e)}
+                      >
+                        删除
+                      </Button>,
+                    ]}
+                  >
+                    <Card.Meta
+                      title={canvas.title}
+                      description={
+                        <>
+                          <p>创建时间: {new Date(canvas.created_at).toLocaleDateString()}</p>
+                          <p>更新时间: {new Date(canvas.updated_at).toLocaleDateString()}</p>
+                        </>
+                      }
+                    />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
+        </Content>
+      </Layout>
+
+      {/* 设置抽屉 */}
+      <Modal
+        title="系统设置"
+        open={settingsVisible}
+        onCancel={() => setSettingsVisible(false)}
+        footer={null}
+        width={700}
+        destroyOnClose
+      >
+        <Tabs
+          items={[
+            {
+              key: 'llm',
+              label: 'LLM模型配置',
+              children: <LLMSettings />,
+            },
+            {
+              key: 'baidu',
+              label: '百度语音识别',
+              children: <BaiduASRSettings />,
+            },
+          ]}
+        />
+      </Modal>
     </Layout>
   )
 }
