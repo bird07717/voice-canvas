@@ -5,6 +5,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  transition: width 0.2s ease;
+  flex-shrink: 0;
+}
+
+.chat-panel-collapsed {
+  width: 56px;
 }
 
 .chat-header {
@@ -12,6 +18,18 @@
   border-bottom: 1px solid #e8e8e8;
   font-weight: 500;
   font-size: 16px;
+  min-height: 57px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-panel-collapsed .chat-header {
+  padding: 10px 6px;
+  writing-mode: vertical-rl;
+  justify-content: flex-start;
+  border-bottom: 0;
 }
 
 .chat-messages {

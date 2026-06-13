@@ -36,8 +36,8 @@ export default function Login() {
       <div className="login-content">
         <div className="login-product-preview" aria-hidden="true">
           <div className="preview-copy">
-            <span>Voice to visual canvas</span>
-            <strong>把语音灵感变成可编辑画布</strong>
+            <span>Voice controlled drawing</span>
+            <strong>说出想法，画布自动绘制</strong>
           </div>
           <div className="preview-canvas">
             <div className="preview-toolbar">
@@ -45,43 +45,82 @@ export default function Login() {
               <span />
               <span />
             </div>
+            <div className="preview-bubbles">
+              <div className="preview-bubble preview-bubble-user">
+                语音：画一座小房子和树
+              </div>
+              <div className="preview-bubble preview-bubble-ai">
+                正在绘制到画布
+              </div>
+            </div>
             <svg className="preview-drawing" viewBox="0 0 520 330">
               <path
-                className="preview-curve"
-                d="M52 238C112 178 160 258 226 202S340 142 456 198"
-              />
-              <rect
-                className="preview-shape preview-rect"
-                x="72"
-                y="88"
-                width="104"
-                height="72"
-                rx="16"
+                className="preview-sky-line"
+                d="M70 248C140 226 216 230 286 248S398 270 466 236"
               />
               <circle
-                className="preview-shape preview-circle"
-                cx="406"
-                cy="132"
-                r="46"
+                className="preview-sun"
+                cx="438"
+                cy="82"
+                r="30"
               />
               <path
-                className="preview-shape preview-star"
-                d="M230 86l12 27 30 3-22 21 6 30-26-15-26 15 6-30-22-21 30-3 12-27Z"
+                className="preview-cloud"
+                d="M82 100h78c13 0 23-9 23-21 0-11-9-20-21-20-5 0-9 1-13 4-8-13-21-20-36-20-22 0-40 17-40 38 0 7 2 14 6 19h3Z"
+              />
+              <path
+                className="preview-house-roof"
+                d="M144 166l66-54 66 54Z"
               />
               <rect
-                className="preview-selection"
-                x="360"
-                y="86"
-                width="92"
-                height="92"
+                className="preview-house-wall"
+                x="160"
+                y="166"
+                width="100"
+                height="78"
                 rx="8"
               />
-              <circle className="preview-handle" cx="360" cy="86" r="4.5" />
-              <circle className="preview-handle" cx="452" cy="86" r="4.5" />
-              <circle className="preview-handle" cx="452" cy="178" r="4.5" />
-              <circle className="preview-handle" cx="360" cy="178" r="4.5" />
+              <rect
+                className="preview-door"
+                x="202"
+                y="199"
+                width="26"
+                height="45"
+                rx="5"
+              />
+              <rect
+                className="preview-window"
+                x="174"
+                y="181"
+                width="24"
+                height="20"
+                rx="5"
+              />
+              <rect
+                className="preview-tree-trunk"
+                x="362"
+                y="185"
+                width="24"
+                height="60"
+                rx="6"
+              />
+              <circle
+                className="preview-tree-crown"
+                cx="374"
+                cy="152"
+                r="42"
+              />
+              <circle
+                className="preview-tree-crown preview-tree-crown-light"
+                cx="411"
+                cy="164"
+                r="28"
+              />
+              <path
+                className="preview-brush-path"
+                d="M96 278c70-26 142-26 214-8 58 15 106 9 150-17"
+              />
             </svg>
-            <div className="preview-command">画一个红色圆</div>
             <div className="preview-wave">
               <span />
               <span />

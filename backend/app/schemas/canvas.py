@@ -49,3 +49,25 @@ class VoiceCommandResponse(BaseModel):
     response: str
     reason: Optional[str] = None
     chat_history: List[ChatMessage]
+
+
+class BaiduASRRequest(BaseModel):
+    api_key: str
+    secret_key: str
+    speech: str
+    len: int
+    cuid: str
+    format: str = "wav"
+    rate: int = 16000
+    channel: int = 1
+    dev_pid: int = 1537
+
+
+class BaiduASRTestRequest(BaseModel):
+    api_key: str
+    secret_key: str
+
+
+class BaiduASRResponse(BaseModel):
+    text: str
+    raw: dict

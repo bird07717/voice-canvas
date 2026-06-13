@@ -12,6 +12,7 @@ interface VoiceState {
 
   // 百度ASR配置
   baiduConfig: {
+    appId: string
     apiKey: string
     secretKey: string
   } | null
@@ -20,7 +21,7 @@ interface VoiceState {
   setStatus: (status: VoiceStatus) => void
   setRecognizedText: (text: string) => void
   setRecognitionType: (type: RecognitionType) => void
-  setBaiduConfig: (config: { apiKey: string; secretKey: string } | null) => void
+  setBaiduConfig: (config: { appId: string; apiKey: string; secretKey: string } | null) => void
   startListening: () => void
   stopListening: () => void
 }
@@ -33,6 +34,7 @@ export const useVoiceStore = create<VoiceState>()(
       recognizedText: '',
       recognitionType: 'none',
       baiduConfig: {
+        appId: '123697514',
         apiKey: 'SRU3kShktNWWRZrw4mANivzE',
         secretKey: 'm95tXCJZAtacKdYXAARtCNgtk5bBj8iS'
       },
