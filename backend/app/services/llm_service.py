@@ -6,6 +6,9 @@ from sqlalchemy import select
 from app.drawing.executor import DrawingExecutor
 from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
+from app.scene.executor import SceneExecutor
+from app.scene.intent import is_scene_request
+from app.scene.planner import ScenePlanner, ScenePlanningError
 
 
 class LLMService:
@@ -380,6 +383,41 @@ arguments: {"reason": "忽略原因"}
 
         if not config:
             raise Exception("No active LLM configuration found")
+
+        if is_scene_request(text):
+            try:
+                scene_plan = await ScenePlanner().plan(text, canvas_context, config)
+                commands = SceneExecutor(canvas_context).execute(scene_plan)
+                return {
+                    "intent": "draw",
+                    "confidence": 0.9,
+                    "commands": commands,
+                    "response": scene_plan.response or f"好的，我规划了{scene_plan.title}场景。",
+                    "reason": "scene_plan",
+                    "scene": {
+                        "scene_type": scene_plan.scene_type,
+                        "title": scene_plan.title,
+                        "style": scene_plan.style,
+                        "object_count": len(commands),
+                        "layout_notes": scene_plan.layout_notes,
+                    },
+                }
+            except ScenePlanningError as e:
+                return {
+                    "intent": "clarify",
+                    "confidence": 0.0,
+                    "commands": [],
+                    "response": e.message,
+                    "reason": e.reason,
+                }
+            except Exception as e:
+                return {
+                    "intent": "clarify",
+                    "confidence": 0.0,
+                    "commands": [],
+                    "response": "我暂时没能完成场景规划，请再说一次或换个简单场景。",
+                    "reason": f"Scene Planner failed: {str(e)}",
+                }
 
         # 调用OpenAI API
         client = AsyncOpenAI(
