@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from app.models.llm_config import LLMConfig
 from app.scene.schemas import ScenePlan
+from app.scene.templates import apply_scene_template
 
 
 class ScenePlanningError(Exception):
@@ -188,4 +189,4 @@ class ScenePlanner:
                 "ScenePlan objects 为空",
             )
 
-        return plan
+        return apply_scene_template(plan)

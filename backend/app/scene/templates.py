@@ -1,5 +1,7 @@
 from copy import deepcopy
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+from app.scene.schemas import SceneBackground, SceneObject, ScenePlan
 
 
 SCENE_TEMPLATES: Dict[str, Dict[str, Any]] = {
@@ -120,3 +122,73 @@ def get_scene_template(scene_type: str) -> Optional[Dict[str, Any]]:
     normalized = normalize_scene_type(scene_type)
     template = SCENE_TEMPLATES.get(normalized)
     return deepcopy(template) if template else None
+
+
+def apply_scene_template(plan: ScenePlan) -> ScenePlan:
+    template = get_scene_template(plan.scene_type)
+    if not template:
+        plan.scene_type = normalize_scene_type(plan.scene_type)
+        return plan
+
+    template_objects = [
+        SceneObject.model_validate(obj)
+        for obj in template.get("default_objects", [])
+    ]
+    extra_objects = _extract_extra_objects(plan.objects, template_objects)
+    palette = template.get("palette", {})
+    layout = template.get("layout", {})
+
+    plan.scene_type = template["scene_type"]
+    plan.background = plan.background or _template_background(palette, layout)
+    plan.objects = [*template_objects, *extra_objects]
+    if not plan.layout_notes:
+        plan.layout_notes = "使用内置场景模板生成基础构图，并合并用户指定对象。"
+    return plan
+
+
+def _extract_extra_objects(
+    planned_objects: List[SceneObject],
+    template_objects: List[SceneObject],
+) -> List[SceneObject]:
+    template_signatures = {
+        _object_signature(obj)
+        for obj in template_objects
+    }
+    template_kinds = {
+        obj.kind.lower()
+        for obj in template_objects
+    }
+
+    extras: List[SceneObject] = []
+    for obj in planned_objects:
+        signature = _object_signature(obj)
+        kind = obj.kind.lower()
+        if signature in template_signatures:
+            continue
+        if kind in template_kinds and not obj.description and not obj.id_hint:
+            continue
+        extras.append(obj)
+
+    return extras
+
+
+def _object_signature(obj: SceneObject) -> tuple[str, str]:
+    return (obj.kind.lower(), (obj.label or "").strip())
+
+
+def _template_background(
+    palette: Dict[str, Any],
+    layout: Dict[str, Any],
+) -> Optional[SceneBackground]:
+    sky = palette.get("sky") or palette.get("paper") or palette.get("wall")
+    ground = palette.get("sand") or palette.get("grass")
+    horizon_y = layout.get("horizon_y")
+
+    if not sky and not ground and horizon_y is None:
+        return None
+
+    return SceneBackground(
+        fill=sky,
+        horizon_y=horizon_y,
+        ground_fill=ground,
+    )
