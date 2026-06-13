@@ -4,6 +4,10 @@ import Konva from 'konva'
 interface CanvasState {
   currentCanvasId: number | null
   canvasObjects: any[]
+  lastCreatedObjectId: string | null
+  lastModifiedObjectId: string | null
+  selectedObjectId: string | null
+  recentCommands: any[]
   history: any[][]
   historyStep: number
   isDrawing: boolean
@@ -11,6 +15,8 @@ interface CanvasState {
 
   setCurrentCanvasId: (id: number | null) => void
   setCanvasObjects: (objects: any[]) => void
+  setSelectedObjectId: (id: string | null) => void
+  recordCommands: (commands: any[]) => void
   addObject: (object: any) => void
   updateObject: (id: string, updates: any) => void
   removeObject: (id: string) => void
@@ -25,6 +31,10 @@ interface CanvasState {
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   currentCanvasId: null,
   canvasObjects: [],
+  lastCreatedObjectId: null,
+  lastModifiedObjectId: null,
+  selectedObjectId: null,
+  recentCommands: [],
   history: [[]],
   historyStep: 0,
   isDrawing: false,
@@ -34,9 +44,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setCanvasObjects: (objects) => set({ canvasObjects: objects }),
 
+  setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+
+  recordCommands: (commands) =>
+    set((state) => ({
+      recentCommands: [...state.recentCommands, ...commands].slice(-20),
+    })),
+
   addObject: (object) => {
     set((state) => ({
       canvasObjects: [...state.canvasObjects, object],
+      lastCreatedObjectId: object.id,
+      lastModifiedObjectId: object.id,
     }))
     get().saveToHistory()
   },
@@ -48,6 +67,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           ? { ...obj, params: { ...obj.params, ...updates } }
           : obj
       ),
+      lastModifiedObjectId: id,
     }))
     get().saveToHistory()
   },
@@ -55,12 +75,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeObject: (id) => {
     set((state) => ({
       canvasObjects: state.canvasObjects.filter((obj) => obj.id !== id),
+      selectedObjectId: state.selectedObjectId === id ? null : state.selectedObjectId,
     }))
     get().saveToHistory()
   },
 
   clearCanvas: () => {
-    set({ canvasObjects: [] })
+    set({
+      canvasObjects: [],
+      lastCreatedObjectId: null,
+      lastModifiedObjectId: null,
+      selectedObjectId: null,
+      recentCommands: [],
+    })
     get().saveToHistory()
   },
 
@@ -71,6 +98,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       set({
         historyStep: newStep,
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
+        lastModifiedObjectId: null,
       })
     }
   },
@@ -82,6 +110,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       set({
         historyStep: newStep,
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
+        lastModifiedObjectId: null,
       })
     }
   },
@@ -104,6 +133,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         canvasObjects: json.objects,
         history: [json.objects],
         historyStep: 0,
+        lastCreatedObjectId: json.objects[json.objects.length - 1]?.id || null,
+        lastModifiedObjectId: null,
+        selectedObjectId: null,
+        recentCommands: [],
       })
     }
   },
