@@ -186,7 +186,7 @@
 .preview-sky-line,
 .preview-brush-path {
   fill: none;
-  stroke: rgba(125, 211, 252, 0.52);
+  stroke: rgba(96, 165, 250, 0.64);
   stroke-width: 7;
   stroke-linecap: round;
 }
@@ -196,7 +196,7 @@
 }
 
 .preview-brush-path {
-  stroke: rgba(134, 239, 172, 0.5);
+  stroke: rgba(74, 222, 128, 0.58);
   stroke-width: 8;
   stroke-dasharray: 18 18;
 }
@@ -210,44 +210,53 @@
 .preview-sun,
 .preview-cloud {
   stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 2.7;
+  stroke-width: 3.4;
 }
 
 .preview-sun {
-  fill: rgba(250, 204, 21, 0.62);
+  fill: rgba(250, 204, 21, 0.72);
+  stroke: rgba(253, 224, 71, 0.64);
 }
 
 .preview-cloud {
-  fill: rgba(255, 255, 255, 0.22);
+  fill: rgba(219, 234, 254, 0.48);
+  stroke: rgba(147, 197, 253, 0.58);
 }
 
 .preview-house-roof {
-  fill: rgba(248, 113, 113, 0.66);
+  fill: rgba(248, 113, 113, 0.72);
+  stroke: rgba(252, 165, 165, 0.68);
   stroke-linejoin: round;
 }
 
 .preview-house-wall {
-  fill: rgba(34, 211, 238, 0.24);
+  fill: rgba(103, 232, 249, 0.42);
+  stroke: rgba(125, 211, 252, 0.68);
 }
 
 .preview-door {
-  fill: rgba(99, 102, 241, 0.46);
+  fill: rgba(99, 102, 241, 0.58);
+  stroke: rgba(129, 140, 248, 0.7);
 }
 
 .preview-window {
-  fill: rgba(255, 255, 255, 0.36);
+  fill: rgba(255, 255, 255, 0.62);
+  stroke: rgba(147, 197, 253, 0.62);
 }
 
 .preview-tree-trunk {
-  fill: rgba(180, 83, 9, 0.46);
+  fill: rgba(180, 83, 9, 0.56);
+  stroke: rgba(217, 119, 6, 0.48);
 }
 
 .preview-tree-crown {
-  fill: rgba(34, 197, 94, 0.5);
+  fill: rgba(34, 197, 94, 0.58);
+  stroke: rgba(74, 222, 128, 0.6);
 }
 
 .preview-tree-crown-light {
-  fill: rgba(74, 222, 128, 0.38);
+  fill: rgba(74, 222, 128, 0.48);
+  stroke: rgba(134, 239, 172, 0.58);
 }
 
 .preview-wave {
