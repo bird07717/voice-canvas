@@ -56,6 +56,12 @@ export default function ChatPanel() {
     })
   }
 
+  const getCommandCount = (commandJson: any) =>
+    commandJson?.commands?.length || 0
+
+  const getSceneTitle = (commandJson: any) =>
+    commandJson?.scene?.title || commandJson?.scene?.scene_title || ''
+
   return (
     <div className={`chat-panel ${collapsed ? 'chat-panel-collapsed' : ''}`}>
       <div className="chat-header">
@@ -84,9 +90,16 @@ export default function ChatPanel() {
               <div className="chat-message-content">
                 {msg.content}
                 {msg.command_json && (
-                  <div className="chat-command">
-                    执行了 {msg.command_json.commands?.length || 0} 个命令
-                  </div>
+                  <>
+                    <div className="chat-command">
+                      执行了 {getCommandCount(msg.command_json)} 个命令
+                    </div>
+                    {getSceneTitle(msg.command_json) && (
+                      <div className="chat-command">
+                        场景：{getSceneTitle(msg.command_json)}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="chat-time">{formatTime(msg.created_at)}</div>

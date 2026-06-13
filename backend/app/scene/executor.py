@@ -121,6 +121,7 @@ class SceneExecutor:
                     "kindLabel": f"{plan.title}背景",
                     "sceneType": plan.scene_type,
                     "sceneTitle": plan.title,
+                    "sceneStyle": plan.style,
                 },
             })
 
@@ -142,6 +143,7 @@ class SceneExecutor:
                     "kindLabel": "地面",
                     "sceneType": plan.scene_type,
                     "sceneTitle": plan.title,
+                    "sceneStyle": plan.style,
                 },
             })
 
@@ -241,6 +243,7 @@ class SceneExecutor:
             "kindLabel": label,
             "sceneType": plan.scene_type,
             "sceneTitle": plan.title,
+            "sceneStyle": plan.style,
             "sceneRole": scene_object.role,
         })
 

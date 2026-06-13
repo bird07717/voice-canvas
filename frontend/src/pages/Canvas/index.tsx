@@ -90,7 +90,8 @@ export default function Canvas() {
         title: canvasTitle,
         canvas_json: {
           objects: canvasObjects,
-          version: '1.0',
+          version: '1.1',
+          scene_meta: getSceneMeta(),
         },
       })
       message.success('保存成功')
@@ -99,6 +100,20 @@ export default function Canvas() {
     } catch (error) {
       message.error('保存失败')
       return false
+    }
+  }
+
+  const getSceneMeta = () => {
+    const sceneObject = [...canvasObjects]
+      .reverse()
+      .find((obj) => obj.params?.sceneType)
+
+    if (!sceneObject) return undefined
+
+    return {
+      last_scene_type: sceneObject.params.sceneType,
+      title: sceneObject.params.sceneTitle,
+      style: sceneObject.params.sceneStyle || 'cartoon_flat',
     }
   }
 

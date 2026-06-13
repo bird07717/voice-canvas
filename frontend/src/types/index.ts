@@ -47,6 +47,11 @@ export interface CanvasData {
   canvas_json: {
     objects: CanvasObject[]
     version: string
+    scene_meta?: {
+      last_scene_type?: string
+      title?: string
+      style?: string
+    }
   }
   thumbnail_url?: string
   created_at: string
