@@ -117,6 +117,29 @@ class ApiService {
     return response.data
   }
 
+  async testBaiduASR(data: {
+    api_key: string
+    secret_key: string
+  }) {
+    const response = await this.client.post('/api/voice/baidu/test', data)
+    return response.data
+  }
+
+  async recognizeWithBaidu(data: {
+    api_key: string
+    secret_key: string
+    speech: string
+    len: number
+    cuid: string
+    format?: string
+    rate?: number
+    channel?: number
+    dev_pid?: number
+  }): Promise<{ text: string; raw: any }> {
+    const response = await this.client.post('/api/voice/baidu/asr', data)
+    return response.data
+  }
+
   // LLM配置相关
   async getLLMConfigs() {
     const response = await this.client.get('/api/llm/configs')

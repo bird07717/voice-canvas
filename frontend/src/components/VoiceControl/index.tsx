@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button, Space, message, Tag } from 'antd'
 import { AudioOutlined, AudioMutedOutlined } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
@@ -19,9 +19,11 @@ export default function VoiceControl() {
     setStatus,
     setRecognitionType
   } = useVoiceStore()
-  const { activeConfig, setIsProcessing } = useLLMStore()
+  const { activeConfig, setIsProcessing, setChatHistory } = useLLMStore()
   const { currentCanvasId, addObject, updateObject, removeObject, clearCanvas, undo } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
+  const lastFinalTextRef = useRef('')
+  const lastFinalTimeRef = useRef(0)
 
   useEffect(() => {
     // 初始化语音服务
@@ -62,7 +64,16 @@ export default function VoiceControl() {
         (text, isFinal) => {
           setRecognizedText(text)
           if (isFinal) {
-            handleVoiceCommand(text)
+            const normalizedText = text.trim()
+            const now = Date.now()
+            if (
+              normalizedText &&
+              (normalizedText !== lastFinalTextRef.current || now - lastFinalTimeRef.current > 2000)
+            ) {
+              lastFinalTextRef.current = normalizedText
+              lastFinalTimeRef.current = now
+              handleVoiceCommand(normalizedText)
+            }
           }
         },
         (error) => {
@@ -99,6 +110,10 @@ export default function VoiceControl() {
 
       if (response.intent === 'ignore') {
         return
+      }
+
+      if (response.chat_history.length > 0) {
+        setChatHistory(response.chat_history)
       }
 
       if (response.intent === 'clarify') {
@@ -219,7 +234,7 @@ export default function VoiceControl() {
         )}
 
         <div className="voice-tips">
-          <h4>语音命令示例：</h4>
+          <h4>实时语音命令示例：</h4>
           <ul>
             <li>"画一个红色的圆"</li>
             <li>"画一个蓝色的矩形"</li>
@@ -234,8 +249,7 @@ export default function VoiceControl() {
         {recognitionType === 'webspeech' && (
           <div className="voice-status-info">
             <p>
-              ℹ️ 当前使用浏览器识别（降级方案），识别准确率可能较低。
-              {!baiduConfig && '建议在首页设置中配置百度ASR以获得更好的识别效果。'}
+              当前使用实时连续识别，说完一句后会自动处理，无需点击停止。
             </p>
           </div>
         )}

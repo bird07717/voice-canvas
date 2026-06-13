@@ -1,4 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Button } from 'antd'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { apiService } from '@/services/api'
@@ -7,12 +9,20 @@ import './ChatPanel.css'
 export default function ChatPanel() {
   const { chatHistory, setChatHistory } = useLLMStore()
   const { currentCanvasId } = useCanvasStore()
+  const [collapsed, setCollapsed] = useState(false)
+  const messagesRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (currentCanvasId) {
       loadChatHistory()
     }
   }, [currentCanvasId])
+
+  useEffect(() => {
+    if (!collapsed && messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight
+    }
+  }, [chatHistory, collapsed])
 
   const loadChatHistory = async () => {
     if (!currentCanvasId) return
@@ -34,9 +44,22 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="chat-panel">
-      <div className="chat-header">对话历史</div>
-      <div className="chat-messages">
+    <div className={`chat-panel ${collapsed ? 'chat-panel-collapsed' : ''}`}>
+      <div className="chat-header">
+        {!collapsed && <span>对话历史</span>}
+        <Button
+          type="text"
+          size="small"
+          icon={collapsed ? <LeftOutlined /> : <RightOutlined />}
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? '展开对话历史' : '收起对话历史'}
+        >
+          {collapsed ? '历史' : ''}
+        </Button>
+      </div>
+
+      {!collapsed && (
+      <div className="chat-messages" ref={messagesRef}>
         {chatHistory.length === 0 ? (
           <div className="empty-chat">开始语音对话，这里将显示历史记录</div>
         ) : (
@@ -58,6 +81,7 @@ export default function ChatPanel() {
           ))
         )}
       </div>
+      )}
     </div>
   )
 }

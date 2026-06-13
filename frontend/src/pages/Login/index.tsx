@@ -56,7 +56,7 @@ export default function Login() {
             <svg className="preview-drawing" viewBox="0 0 520 330">
               <path
                 className="preview-sky-line"
-                d="M70 260C140 238 216 242 286 260S398 282 466 248"
+                d="M70 248C140 226 216 230 286 248S398 270 466 236"
               />
               <circle
                 className="preview-sun"
@@ -70,12 +70,12 @@ export default function Login() {
               />
               <path
                 className="preview-house-roof"
-                d="M144 178l66-56 66 56Z"
+                d="M144 166l66-54 66 54Z"
               />
               <rect
                 className="preview-house-wall"
                 x="160"
-                y="178"
+                y="166"
                 width="100"
                 height="78"
                 rx="8"
@@ -83,7 +83,7 @@ export default function Login() {
               <rect
                 className="preview-door"
                 x="202"
-                y="211"
+                y="199"
                 width="26"
                 height="45"
                 rx="5"
@@ -91,7 +91,7 @@ export default function Login() {
               <rect
                 className="preview-window"
                 x="174"
-                y="193"
+                y="181"
                 width="24"
                 height="20"
                 rx="5"
@@ -99,7 +99,7 @@ export default function Login() {
               <rect
                 className="preview-tree-trunk"
                 x="362"
-                y="197"
+                y="185"
                 width="24"
                 height="60"
                 rx="6"
@@ -107,18 +107,18 @@ export default function Login() {
               <circle
                 className="preview-tree-crown"
                 cx="374"
-                cy="164"
+                cy="152"
                 r="42"
               />
               <circle
                 className="preview-tree-crown preview-tree-crown-light"
                 cx="411"
-                cy="176"
+                cy="164"
                 r="28"
               />
               <path
                 className="preview-brush-path"
-                d="M96 288c70-28 142-28 214-8 58 16 106 10 150-18"
+                d="M96 278c70-26 142-26 214-8 58 15 106 9 150-17"
               />
             </svg>
             <div className="preview-wave">

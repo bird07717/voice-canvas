@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Form, Input, Button, Card, message, Space, Divider } from 'antd'
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
+import { apiService } from '@/services/api'
 import './BaiduASRSettings.css'
 
 export default function BaiduASRSettings() {
@@ -16,23 +17,15 @@ export default function BaiduASRSettings() {
       setTesting(true)
       setTestResult(null)
 
-      // 测试获取access_token
-      const url = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${values.apiKey}&client_secret=${values.secretKey}`
+      await apiService.testBaiduASR({
+        api_key: values.apiKey,
+        secret_key: values.secretKey,
+      })
 
-      const response = await fetch(url, { method: 'POST' })
-      const data = await response.json()
-
-      if (data.error) {
-        setTestResult({
-          success: false,
-          message: `测试失败: ${data.error_description || data.error}`
-        })
-      } else if (data.access_token) {
-        setTestResult({
-          success: true,
-          message: '连接测试成功！百度ASR配置有效'
-        })
-      }
+      setTestResult({
+        success: true,
+        message: '连接测试成功！百度ASR配置有效'
+      })
     } catch (error: any) {
       setTestResult({
         success: false,
