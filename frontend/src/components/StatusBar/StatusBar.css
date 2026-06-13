@@ -22,12 +22,38 @@
 }
 
 .status-icon {
-  animation: pulse 1.5s ease-in-out infinite;
+  display: inline-flex;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+.status-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 14px;
+  animation: status-spin 0.75s linear infinite;
+  transform-origin: center;
+}
+
+.status-spinner-blue {
+  color: #1890ff;
+}
+
+.status-spinner-purple {
+  color: #722ed1;
+}
+
+@keyframes status-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-spinner {
+    animation: none;
+  }
 }
 
 .recognized-text {

@@ -19,6 +19,19 @@ export default function ChatPanel() {
   }, [currentCanvasId])
 
   useEffect(() => {
+    const handleHistoryUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ canvasId?: number | null }>).detail
+      if (!currentCanvasId || (detail?.canvasId && detail.canvasId !== currentCanvasId)) return
+      loadChatHistory()
+    }
+
+    window.addEventListener('voice-canvas:chat-history-updated', handleHistoryUpdated)
+    return () => {
+      window.removeEventListener('voice-canvas:chat-history-updated', handleHistoryUpdated)
+    }
+  }, [currentCanvasId])
+
+  useEffect(() => {
     if (!collapsed && messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight
     }
