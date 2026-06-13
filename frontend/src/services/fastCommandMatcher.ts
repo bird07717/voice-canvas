@@ -98,22 +98,69 @@ const KIND_ALIASES: Array<[RegExp, string[], string]> = [
   [/花/, ['flower'], '花'],
   [/人|小人/, ['person'], '小人'],
   [/车|汽车/, ['car'], '汽车'],
+  [/山|山峰/, ['mountain'], '山'],
+  [/草|草地/, ['grass'], '草地'],
+  [/路|道路|小路/, ['road'], '道路'],
+  [/河|河流|海|海面/, ['river'], '河流'],
 ]
+
+const getTargetDirection = (text: string) => {
+  if (/左边|最左|左侧/.test(text)) return 'left'
+  if (/右边|最右|右侧/.test(text)) return 'right'
+  if (/上边|最上|上面|顶部/.test(text)) return 'top'
+  if (/下边|最下|下面|底部/.test(text)) return 'bottom'
+  if (/中间|中央|中心/.test(text)) return 'center'
+  return null
+}
 
 const findTargetByKind = (text: string, context: CanvasCommandContext) => {
   const alias = KIND_ALIASES.find(([pattern]) => pattern.test(text))
   if (!alias) return null
 
-  const [, kinds] = alias
-  const matched = [...context.objects]
-    .reverse()
-    .find((obj) => {
+  const [, kinds, label] = alias
+  const matchedObjects = context.objects.filter((obj) => {
       const type = String(obj.type || '').toLowerCase()
       const kind = String(obj.kind || '').toLowerCase()
-      return kinds.includes(type) || kinds.includes(kind)
+      const kindLabel = String(obj.kindLabel || '')
+      return kinds.includes(type) || kinds.includes(kind) || kindLabel.includes(label)
     })
 
+  if (!matchedObjects.length) return null
+
+  const direction = getTargetDirection(text)
+  const matched = pickObjectByDirection(matchedObjects, direction)
   return matched?.id || null
+}
+
+const pickObjectByDirection = (
+  objects: CanvasCommandContext['objects'],
+  direction: string | null
+) => {
+  if (!direction) return [...objects].reverse()[0]
+
+  const withPosition = objects.filter(
+    (obj) => typeof obj.x === 'number' && typeof obj.y === 'number'
+  )
+  const candidates = withPosition.length ? withPosition : objects
+
+  if (direction === 'left') {
+    return [...candidates].sort((a, b) => (a.x ?? 0) - (b.x ?? 0))[0]
+  }
+  if (direction === 'right') {
+    return [...candidates].sort((a, b) => (b.x ?? 0) - (a.x ?? 0))[0]
+  }
+  if (direction === 'top') {
+    return [...candidates].sort((a, b) => (a.y ?? 0) - (b.y ?? 0))[0]
+  }
+  if (direction === 'bottom') {
+    return [...candidates].sort((a, b) => (b.y ?? 0) - (a.y ?? 0))[0]
+  }
+
+  return [...candidates].sort((a, b) => {
+    const aDistance = Math.abs((a.x ?? 400) - 400) + Math.abs((a.y ?? 300) - 300)
+    const bDistance = Math.abs((b.x ?? 400) - 400) + Math.abs((b.y ?? 300) - 300)
+    return aDistance - bDistance
+  })[0]
 }
 
 const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>

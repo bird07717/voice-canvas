@@ -104,6 +104,8 @@ const getShapeBounds = (obj: CanvasObject) => {
 }
 
 const getObjectLabel = (obj: CanvasObject) => {
+  if (obj.params?.kindLabel) return String(obj.params.kindLabel)
+
   const kind = String(obj.params?.kind || obj.type || '')
   const labels: Record<string, string> = {
     circle: '圆形',

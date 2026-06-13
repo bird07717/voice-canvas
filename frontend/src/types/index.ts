@@ -58,6 +58,7 @@ export interface CanvasContextObject {
   id: string
   type: string
   kind?: string
+  kindLabel?: string
   text?: string
   x?: number
   y?: number
