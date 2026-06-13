@@ -4,7 +4,6 @@ import {
   Layout,
   Button,
   Select,
-  Tabs,
   message,
   Modal,
   Input,
@@ -23,8 +22,6 @@ import { apiService } from '@/services/api'
 import CanvasBoard from '@/components/CanvasBoard'
 import VoiceControl from '@/components/VoiceControl'
 import ChatPanel from '@/components/ChatPanel'
-import LLMSettings from '@/components/LLMSettings'
-import BaiduASRSettings from '@/components/BaiduASRSettings'
 import StatusBar from '@/components/StatusBar'
 import './Canvas.css'
 
@@ -177,6 +174,7 @@ export default function Canvas() {
             value={activeConfig?.id}
             onChange={handleModelChange}
             placeholder="选择模型"
+            style={{ minWidth: 200 }}
             options={configs.map((c) => ({
               label: `${c.name} (${c.model_name})`,
               value: c.id,
@@ -199,26 +197,7 @@ export default function Canvas() {
 
       <div className="canvas-main">
         <div className="canvas-sidebar">
-          <Tabs
-            className="sidebar-tabs"
-            items={[
-              {
-                key: 'voice',
-                label: '语音控制',
-                children: <VoiceControl />,
-              },
-              {
-                key: 'baidu',
-                label: '百度ASR',
-                children: <BaiduASRSettings />,
-              },
-              {
-                key: 'llm',
-                label: 'LLM设置',
-                children: <LLMSettings />,
-              },
-            ]}
-          />
+          <VoiceControl />
         </div>
 
         <div className="canvas-center">
