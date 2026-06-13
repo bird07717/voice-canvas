@@ -46,6 +46,10 @@
 - [x] 前端 Vite 临时输出目录构建通过。
 - [ ] 浏览器语音端到端手动测试待执行。
 
-## 已知环境问题
+## Day 15 验证记录
 
-- 当前仓库 `frontend/dist` 内有归属 `nobody:nogroup` 的旧构建产物，导致默认 `npm run build` 无法清理输出目录。本轮用 `/tmp/voice-canvas-dist` 作为临时 outDir 完成构建验证。
+- [x] 清理旧 `frontend/dist` 构建产物权限问题后，`npm run build` 通过。
+- [x] 后端 `backend/app/**/*.py` 本地语法检查通过。
+- [x] 后端容器内语法检查通过。
+- [x] 前端 Vite 临时输出目录构建通过。
+- [ ] 浏览器语音端到端手动测试待执行。
