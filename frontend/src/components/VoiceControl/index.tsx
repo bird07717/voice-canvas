@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Space, message, Tag } from 'antd'
-import { AudioOutlined, AudioMutedOutlined, ReloadOutlined } from '@ant-design/icons'
+import { AudioOutlined, AudioMutedOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
 import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
@@ -25,6 +25,8 @@ type CommandExecutionOptions = {
 }
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const {
@@ -769,6 +771,19 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         >
           取消/重说
         </Button>
+
+        <Space wrap size={[8, 8]}>
+          {SCENE_SHORTCUTS.map((scene) => (
+            <Button
+              key={scene}
+              icon={<PictureOutlined />}
+              size="small"
+              onClick={() => handleVoiceCommand(`画一个${scene}`)}
+            >
+              {scene}
+            </Button>
+          ))}
+        </Space>
 
         <div className="voice-feedback-panel">
           <div className="voice-feedback-row">
