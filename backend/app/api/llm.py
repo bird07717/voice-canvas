@@ -171,7 +171,7 @@ async def test_llm_connection(
     """测试LLM连接"""
     try:
         llm_service = LLMService(None)
-        success = await llm_service.test_connection(
+        success, message = await llm_service.test_connection(
             base_url=test_data.base_url,
             api_key=test_data.api_key,
             model_name=test_data.model_name
@@ -180,12 +180,12 @@ async def test_llm_connection(
         if success:
             return LLMTestResponse(
                 success=True,
-                message="Connection successful"
+                message=message
             )
         else:
             return LLMTestResponse(
                 success=False,
-                message="Connection failed"
+                message=message
             )
     except Exception as e:
         return LLMTestResponse(
