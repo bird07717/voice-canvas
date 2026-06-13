@@ -23,6 +23,29 @@ const isFiniteNumber = (value: unknown): value is number =>
 const hasOwn = (object: any, key: string) =>
   Object.prototype.hasOwnProperty.call(object, key)
 
+const getDefinedUpdates = (updates: any) =>
+  Object.fromEntries(Object.entries(updates || {}).filter(([, value]) => value !== undefined))
+
+const sanitizeGroupParams = (params: any) => {
+  const {
+    x,
+    y,
+    width,
+    height,
+    radius,
+    innerRadius,
+    outerRadius,
+    points,
+    scaleX,
+    scaleY,
+    offsetX,
+    offsetY,
+    ...rest
+  } = params || {}
+
+  return rest
+}
+
 const getPointBounds = (points: number[]): Bounds | null => {
   if (!Array.isArray(points) || points.length < 2) return null
 
@@ -192,8 +215,29 @@ const applyStyleUpdates = (obj: any, updates: any): any => {
 }
 
 const updateGroupObject = (obj: any, updates: any): any => {
-  const bounds = getObjectBounds(obj)
+  const groupParams = obj.params || {}
+  const legacyOffsetX = isFiniteNumber(groupParams.x) ? groupParams.x : 0
+  const legacyOffsetY = isFiniteNumber(groupParams.y) ? groupParams.y : 0
   let children = obj.children || []
+  let bounds = getObjectBounds(obj)
+
+  if (bounds && (legacyOffsetX !== 0 || legacyOffsetY !== 0)) {
+    const legacyTransform: TransformOptions = {
+      dx: legacyOffsetX,
+      dy: legacyOffsetY,
+      scaleX: 1,
+      scaleY: 1,
+      originX: bounds.x,
+      originY: bounds.y,
+    }
+
+    children = children.map((child: any) => transformObject(child, legacyTransform))
+    bounds = {
+      ...bounds,
+      x: bounds.x + legacyOffsetX,
+      y: bounds.y + legacyOffsetY,
+    }
+  }
 
   if (bounds) {
     const hasX = hasOwn(updates, 'x') && isFiniteNumber(updates.x)
@@ -228,11 +272,11 @@ const updateGroupObject = (obj: any, updates: any): any => {
     children = children.map((child: any) => applyStyleUpdates(child, styleUpdates))
   }
 
-  const groupParams = { ...(obj.params || {}), ...styleUpdates }
+  const nextGroupParams = sanitizeGroupParams({ ...groupParams, ...styleUpdates })
 
   return {
     ...obj,
-    params: groupParams,
+    params: nextGroupParams,
     children,
   }
 }
@@ -240,11 +284,13 @@ const updateGroupObject = (obj: any, updates: any): any => {
 const updateCanvasObject = (obj: any, id: string, updates: any): any => {
   if (obj.id !== id) return obj
 
+  const definedUpdates = getDefinedUpdates(updates)
+
   if (obj.type === 'group') {
-    return updateGroupObject(obj, updates)
+    return updateGroupObject(obj, definedUpdates)
   }
 
-  return { ...obj, params: { ...obj.params, ...updates } }
+  return { ...obj, params: { ...obj.params, ...definedUpdates } }
 }
 
 interface CanvasState {
