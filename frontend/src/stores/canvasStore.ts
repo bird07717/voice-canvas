@@ -261,7 +261,7 @@ const updateGroupObject = (obj: any, updates: any): any => {
   const groupParams = obj.params || {}
   const legacyOffsetX = isFiniteNumber(groupParams.x) ? groupParams.x : 0
   const legacyOffsetY = isFiniteNumber(groupParams.y) ? groupParams.y : 0
-  let children = obj.children || []
+  let children = Array.isArray(updates.children) ? updates.children : obj.children || []
   let bounds = getObjectBounds(obj)
 
   if (bounds && (legacyOffsetX !== 0 || legacyOffsetY !== 0)) {
@@ -391,6 +391,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       canvasObjects: [...state.canvasObjects, object],
       lastCreatedObjectId: object.id,
       lastModifiedObjectId: object.id,
+      selectedObjectId: object.id,
     }))
     get().saveToHistory()
   },
@@ -399,6 +400,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({
       canvasObjects: state.canvasObjects.map((obj) => updateCanvasObject(obj, id, updates)),
       lastModifiedObjectId: id,
+      selectedObjectId: id,
     }))
     get().saveToHistory()
   },
@@ -430,6 +432,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         historyStep: newStep,
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
         lastModifiedObjectId: null,
+        selectedObjectId: null,
       })
     }
   },
@@ -442,6 +445,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         historyStep: newStep,
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
         lastModifiedObjectId: null,
+        selectedObjectId: null,
       })
     }
   },

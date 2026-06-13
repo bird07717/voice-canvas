@@ -4,6 +4,7 @@ import {
   LoadingOutlined,
   CheckCircleOutlined,
   SyncOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
 import { useLLMStore } from '@/stores/llmStore'
@@ -21,10 +22,22 @@ export default function StatusBar() {
           text: '监听中...',
           color: 'success',
         }
-      case 'processing':
+      case 'recognizing':
         return {
           icon: <LoadingOutlined className="status-icon" style={{ color: '#1890ff' }} />,
-          text: '处理中...',
+          text: '识别中...',
+          color: 'processing',
+        }
+      case 'matched':
+        return {
+          icon: <CheckCircleOutlined style={{ color: '#1677ff' }} />,
+          text: '快速匹配',
+          color: 'processing',
+        }
+      case 'thinking':
+        return {
+          icon: <LoadingOutlined className="status-icon" style={{ color: '#1890ff' }} />,
+          text: '理解中...',
           color: 'processing',
         }
       case 'drawing':
@@ -32,6 +45,18 @@ export default function StatusBar() {
           icon: <SyncOutlined className="status-icon" spin style={{ color: '#722ed1' }} />,
           text: '绘制中...',
           color: 'processing',
+        }
+      case 'done':
+        return {
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          text: '已完成',
+          color: 'success',
+        }
+      case 'error':
+        return {
+          icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+          text: '出错',
+          color: 'error',
         }
       default:
         return {
