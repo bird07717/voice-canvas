@@ -21,13 +21,45 @@ const COLOR_MAP: Array<[RegExp, string, string]> = [
   [/橙色?|橙的/, '#f97316', '橙色'],
 ]
 
-const normalizeText = (text: string) =>
-  text
+const normalizeText = (text: string) => {
+  let normalized = text
     .trim()
     .replace(/[，。！？、,.!?:：\s]/g, '')
     .replace(/^请/, '')
     .replace(/^帮我/, '')
     .replace(/^给我/, '')
+    .replace(/选种|选重|选钟|泉州|选州|悬中|选衷/g, '选中')
+    .replace(/原型|圆新|元形|园形|圆行/g, '圆形')
+    .replace(/元|园|圈/g, '圆')
+    .replace(/举型|拒形|矩行|举形/g, '矩形')
+    .replace(/蓝瑟|兰色|蓝的/g, '蓝色')
+    .replace(/红瑟|洪色|红的/g, '红色')
+    .replace(/绿色的|绿的/g, '绿色')
+    .replace(/黄色的|黄的/g, '黄色')
+    .replace(/黑色的|黑的/g, '黑色')
+    .replace(/白色的|白的/g, '白色')
+    .replace(/紫色的|紫的/g, '紫色')
+    .replace(/粉色的|粉的/g, '粉色')
+    .replace(/橙色的|橙的/g, '橙色')
+    .replace(/有上角|又上角/g, '右上角')
+    .replace(/有下角|又下角/g, '右下角')
+    .replace(/网左|望左/g, '往左')
+    .replace(/网右|望右/g, '往右')
+    .replace(/网上|望上/g, '往上')
+    .replace(/网下|望下/g, '往下')
+    .replace(/房大/g, '放大')
+    .replace(/边大/g, '变大')
+    .replace(/边小/g, '变小')
+    .replace(/删了|删掉了/g, '删掉')
+    .replace(/到处|导出/g, '导出')
+
+  normalized = normalized
+    .replace(/^选中$/, '选中当前')
+    .replace(/^选择$/, '选择当前')
+    .replace(/^点一下$/, '点一下当前')
+
+  return normalized
+}
 
 const createId = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -126,23 +158,23 @@ export function matchFastCommand(
     return controlResult('停止当前语音识别', 'cancel', '已停止语音识别')
   }
 
-  if (/^(继续听|开始听|继续识别)$/.test(text)) {
+  if (/^(继续听|开始听|继续识别|接着听)$/.test(text)) {
     return controlResult('继续语音识别', 'continue', '继续听')
   }
 
-  if (/^(保存|保存画布)$/.test(text)) {
+  if (/^(保存|保存画布|保存一下|存一下)$/.test(text)) {
     return controlResult('保存当前画布', 'save')
   }
 
-  if (/^(导出|导出PNG|导出图片|下载图片)$/.test(text)) {
+  if (/^(导出|导出PNG|导出图片|下载图片|导出一下|下载一下)$/.test(text)) {
     return controlResult('导出 PNG 图片', 'export')
   }
 
-  if (/^(撤销|退回一步|上一步)$/.test(text)) {
+  if (/^(撤销|退回一步|上一步|退一步|回退)$/.test(text)) {
     return commandResult('撤销上一步', [{ action: 'undo' }])
   }
 
-  if (/^(重做|恢复一步|下一步)$/.test(text)) {
+  if (/^(重做|恢复一步|下一步|恢复|再做)$/.test(text)) {
     return commandResult('重做下一步', [{ action: 'redo' }])
   }
 
@@ -164,7 +196,7 @@ export function matchFastCommand(
   }
 
   const selectTarget = findTargetByKind(text, context)
-  if (/^(选中|选择|选一下|点一下).+/.test(text)) {
+  if (/^(选中|选择|选一下|点一下|点选).+/.test(text)) {
     const target = selectTarget || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context) : null)
     if (!target) {
       return {
