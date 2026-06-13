@@ -1,11 +1,11 @@
 # 项目当前状态
 
 > 更新时间：2026-06-13
-> 当前分支：`docs/backend-asr-plan`
+> 当前分支：`feature/t5-2-baidu-asr-api`
 
 ## 一句话
 
-纯语音控制绘图工具。阶段 0–4 已完成（执行层、语音闭环、大脑深度层、容错与思考流），当前处在**阶段 5：后端百度 ASR 补强**；T5.1 已完成，下一步是 T5.2 后端 `/api/asr` 接口。
+纯语音控制绘图工具。阶段 0–4 已完成（执行层、语音闭环、大脑深度层、容错与思考流），当前处在**阶段 5：后端百度 ASR 补强**；T5.1/T5.2 已完成，下一步是 T5.3 前端录音链路。
 
 ## 工程形态
 
@@ -24,7 +24,7 @@
 ## 当前关键文件
 
 - 前端语音主循环：`client/src/voice/useVoiceLoop.ts`、`client/src/voice/asr.ts`、`client/src/voice/api.ts`。
-- 后端入口与路由：`server/src/index.ts`（目前只有 `/api/health`、`/api/parse`），`server/src/providers/*`。
+- 后端入口与路由：`server/src/index.ts`（已有 `/api/health`、`/api/parse`、`/api/asr`），`server/src/providers/*`、`server/src/asr/*`、`server/src/routes/asr.ts`。
 - 环境变量样例：`server/.env.example`（已有 Anthropic / DeepSeek / Baidu ASR 占位变量，无真实 key）。
 
 ## 阶段 5 进度
@@ -32,7 +32,7 @@
 后端 ASR 主路径：前端录音 → 后端藏百度 Key → 换 token → 调百度短语音识别 REST → transcript 回流到现有 `/api/parse` 链路。约束：单段音频 < 60 秒，前端硬上限 55 秒、默认 8–12 秒短指令窗口。
 
 - **T5.1** ✅ 百度 ASR 配置、鉴权与密钥安全（`.env.example` 增变量、`BaiduAsrTokenProvider` token 缓存）。
-- **T5.2** ⬜ 后端 `/api/asr` 接口 + `BaiduAsrProvider`（音频转写、`err_no` 错误映射）。
+- **T5.2** ✅ 后端 `/api/asr` 接口 + `BaiduAsrProvider`（音频转写、`err_no` 错误映射）。
 - **T5.3** ⬜ 前端录音链路（MediaRecorder/Web Audio + 55 秒硬上限 + 空白检测）。
 - **T5.4** ⬜ ASR 模式切换（browser/baidu）、状态机接入、失败降级。
 - **T5.5** ⬜ 侧边栏 DevTools 门控（`VITE_ENABLE_DEV_TOOLS`），正式 UI 隐藏调试入口。
@@ -55,4 +55,5 @@
 - 浏览器 Web Speech 在本机频繁报 `network`、漏听，这是引入百度 ASR 的根因；Web Speech 保留为开发 fallback。
 - 百度短语音：60 秒上限、对采样率/声道/格式（16kHz 单声道 PCM/WAV）有要求。
 - 当前 `/api/parse` 前端写死 `model: "mock"`（见 `useVoiceLoop.ts`），尚未接真实模型路由到 UI。
-- T5.1 未用真实百度 Key 做联网 token 获取验证；当前只完成未配置路径与类型检查。
+- 百度 token 获取已用本地 `server/.env` 验证通过；真实 key 不入仓库。
+- `/api/asr` 已用生成的 16k 单声道 WAV 验证 JSON 与 raw audio 两条后端路径；尚未用真实用户中文录音验证。

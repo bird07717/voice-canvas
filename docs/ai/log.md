@@ -2,6 +2,7 @@
 
 > 倒序追加，每条一行：日期 — 任务 — 做了什么 — 结果。
 
+- 2026-06-13 — T5.2 后端 ASR 接口 — 新增 `AsrProvider` 类型、`BaiduAsrProvider`、`/api/asr` 路由，支持 JSON base64 与 raw audio 上传，完成百度 token + ASR 调用链路和结构化错误映射；`next.md` 切换到 T5.3。— 完成，未改动前端。
 - 2026-06-13 — T5.1 百度 ASR 配置与鉴权 — 增加百度 ASR 环境变量占位，新增后端配置读取与 `BaiduAsrTokenProvider`，支持未配置状态识别、access token 获取与内存缓存；`next.md` 切换到 T5.2。— 完成，未改动前端。
 - 2026-06-12 — 删除旧文档 — 删除旧的 MVP/大脑设计/指令能力清单/开发任务清单/架构图文档；把 T5 后续切换摘要收敛到 `docs/ai/status.md`，清理 `AGENTS.md` 与 `docs/ai/*` 中的旧文档引用。— 完成，未改动代码。
 - 2026-06-12 — 文档控制校准 — 明确旧 `docs/` 文档不再作为控制入口，补充 `架构图.md` 的历史背景角色，修正 MVP 中 Windows 开发环境的过期描述；`next.md` 继续指向 T5.1。— 完成，未改动代码。
