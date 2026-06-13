@@ -83,7 +83,7 @@ export default function Canvas() {
   }
 
   const handleSave = async () => {
-    if (!currentCanvasId) return
+    if (!currentCanvasId) return false
 
     try {
       await apiService.updateCanvas(currentCanvasId, {
@@ -95,13 +95,15 @@ export default function Canvas() {
       })
       message.success('保存成功')
       setHasUnsavedChanges(false)
+      return true
     } catch (error) {
       message.error('保存失败')
+      return false
     }
   }
 
   const handleExport = () => {
-    if (!stageRef) return
+    if (!stageRef) return false
 
     try {
       const dataURL = stageRef.toDataURL({ pixelRatio: 2 })
@@ -110,8 +112,10 @@ export default function Canvas() {
       link.href = dataURL
       link.click()
       message.success('导出成功')
+      return true
     } catch (error) {
       message.error('导出失败')
+      return false
     }
   }
 
@@ -197,7 +201,7 @@ export default function Canvas() {
 
       <div className="canvas-main">
         <div className="canvas-sidebar">
-          <VoiceControl />
+          <VoiceControl onSave={handleSave} onExport={handleExport} />
         </div>
 
         <div className="canvas-center">

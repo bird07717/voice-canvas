@@ -1,6 +1,15 @@
 // 绘图命令类型定义
 export interface DrawCommand {
-  action: 'create' | 'modify' | 'move' | 'delete' | 'clear' | 'undo' | 'redo'
+  action:
+    | 'create'
+    | 'modify'
+    | 'move'
+    | 'moveBy'
+    | 'scale'
+    | 'delete'
+    | 'clear'
+    | 'undo'
+    | 'redo'
   type?: string
   id?: string
   target?: string
