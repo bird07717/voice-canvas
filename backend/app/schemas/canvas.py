@@ -49,6 +49,7 @@ class VoiceCommandResponse(BaseModel):
     commands: List[dict]
     response: str
     reason: Optional[str] = None
+    scene: Optional[dict] = None
     chat_history: List[ChatMessage]
 
 

@@ -213,7 +213,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus('thinking')
     setLastCommandSource('llm')
     setInterpretedText('复杂绘图或编辑命令，交给 AI 继续理解。')
-    setExecutionMessage('AI 正在根据你的指令生成绘图步骤...')
+    setExecutionMessage('AI 正在规划完整场景...')
     setIsProcessing(true)
 
     try {
@@ -255,10 +255,14 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         recordCommands(response.commands)
       }
       if (response.response) {
-        setInterpretedText(response.response)
+        setInterpretedText(response.scene ? `理解为：${response.scene.title}场景` : response.response)
       }
       setStatus('done')
-      setExecutionMessage(response.response || '已完成')
+      setExecutionMessage(
+        response.scene
+          ? `执行状态：已生成 ${response.scene.object_count || response.commands.length} 个对象`
+          : response.response || '已完成'
+      )
     } catch (error: any) {
       setStatus('error')
       setErrorMessage(error.response?.data?.detail || '处理命令失败')

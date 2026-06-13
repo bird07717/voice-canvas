@@ -96,6 +96,13 @@ export interface VoiceCommandResponse {
   commands: DrawCommand[]
   response: string
   reason?: string
+  scene?: {
+    scene_type: string
+    title: string
+    style: string
+    object_count: number
+    layout_notes?: string | null
+  }
   chat_history: ChatMessage[]
 }
 

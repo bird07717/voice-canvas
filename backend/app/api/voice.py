@@ -159,6 +159,7 @@ async def process_voice_command(
             commands=[],
             response="",
             reason=llm_response.get("reason"),
+            scene=llm_response.get("scene"),
             chat_history=[]
         )
 
@@ -179,7 +180,8 @@ async def process_voice_command(
             "intent": llm_response["intent"],
             "confidence": llm_response["confidence"],
             "commands": llm_response["commands"],
-            "reason": llm_response.get("reason")
+            "reason": llm_response.get("reason"),
+            "scene": llm_response.get("scene")
         }
     )
     db.add(assistant_message)
@@ -200,6 +202,7 @@ async def process_voice_command(
         commands=llm_response["commands"],
         response=llm_response["response"],
         reason=llm_response.get("reason"),
+        scene=llm_response.get("scene"),
         chat_history=[ChatMessage.model_validate(msg) for msg in chat_history]
     )
 
