@@ -31,7 +31,16 @@ TEMPLATE_KINDS = {
     "mountain",
     "grass",
     "road",
-    "river"
+    "river",
+    "palm_tree",
+    "bench",
+    "balloon",
+    "gift",
+    "cake",
+    "building",
+    "sailboat",
+    "fence",
+    "desk"
 }
 
 BASIC_SHAPES = {
@@ -420,6 +429,15 @@ class DrawingExecutor:
             "河流": "river",
             "海": "river",
             "海面": "river",
+            "椰子树": "palm_tree",
+            "长椅": "bench",
+            "气球": "balloon",
+            "礼物": "gift",
+            "蛋糕": "cake",
+            "高楼": "building",
+            "帆船": "sailboat",
+            "栅栏": "fence",
+            "课桌": "desk",
         }
         return aliases.get(kind, kind)
 
@@ -554,4 +572,109 @@ class DrawingExecutor:
     def _template_river(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
         return [
             {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.45, y, x - width * 0.2, y - height * 0.18, x, y + height * 0.12, x + width * 0.22, y - height * 0.12, x + width * 0.45, y], "stroke": style.get("stroke", "#3498DB"), "strokeWidth": height * 0.25, "lineCap": "round", "lineJoin": "round"}}
+        ]
+
+    def _template_palm_tree(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        trunk = style.get("stroke", "#8B5A2B")
+        leaf = style.get("fill", "#16A34A")
+        top_x = x + width * 0.08
+        top_y = y - height * 0.34
+        return [
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.08, y + height * 0.38, x, y + height * 0.05, top_x, top_y], "stroke": trunk, "strokeWidth": width * 0.09, "lineCap": "round", "lineJoin": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [top_x, top_y, top_x - width * 0.42, top_y - height * 0.16], "stroke": leaf, "strokeWidth": width * 0.08, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [top_x, top_y, top_x + width * 0.42, top_y - height * 0.16], "stroke": leaf, "strokeWidth": width * 0.08, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [top_x, top_y, top_x - width * 0.3, top_y + height * 0.08], "stroke": leaf, "strokeWidth": width * 0.08, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [top_x, top_y, top_x + width * 0.3, top_y + height * 0.08], "stroke": leaf, "strokeWidth": width * 0.08, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "circle", "params": {"x": top_x - width * 0.04, "y": top_y + height * 0.08, "radius": width * 0.045, "fill": "#92400E", "stroke": "#78350F", "strokeWidth": 1}},
+        ]
+
+    def _template_bench(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        wood = style.get("fill", "#B45309")
+        dark = style.get("stroke", "#7C2D12")
+        return [
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.42, "y": y - height * 0.24, "width": width * 0.84, "height": height * 0.14, "fill": wood, "stroke": dark, "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.45, "y": y - height * 0.02, "width": width * 0.9, "height": height * 0.16, "fill": wood, "stroke": dark, "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.28, y + height * 0.14, x - width * 0.34, y + height * 0.42], "stroke": dark, "strokeWidth": 5, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x + width * 0.28, y + height * 0.14, x + width * 0.34, y + height * 0.42], "stroke": dark, "strokeWidth": 5, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.38, y - height * 0.1, x + width * 0.38, y - height * 0.1], "stroke": "#FCD34D", "strokeWidth": 2}},
+        ]
+
+    def _template_balloon(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#FB7185")
+        return [
+            {"id": self._next_id(), "type": "circle", "params": {"x": x, "y": y - height * 0.22, "radius": min(width, height) * 0.26, "fill": fill, "stroke": "#BE123C", "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "polygon", "params": {"points": [x - width * 0.05, y + height * 0.02, x + width * 0.05, y + height * 0.02, x, y + height * 0.12], "fill": fill, "stroke": "#BE123C", "strokeWidth": 1, "closed": True}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x, y + height * 0.12, x - width * 0.08, y + height * 0.34, x + width * 0.04, y + height * 0.5], "stroke": "#64748B", "strokeWidth": 2, "lineCap": "round", "lineJoin": "round"}},
+            {"id": self._next_id(), "type": "circle", "params": {"x": x - width * 0.1, "y": y - height * 0.32, "radius": min(width, height) * 0.06, "fill": "#FFFFFF", "opacity": 0.65}},
+        ]
+
+    def _template_gift(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#60A5FA")
+        ribbon = style.get("stroke", "#F97316")
+        return [
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.32, "y": y - height * 0.12, "width": width * 0.64, "height": height * 0.48, "fill": fill, "stroke": "#1D4ED8", "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.36, "y": y - height * 0.22, "width": width * 0.72, "height": height * 0.16, "fill": "#93C5FD", "stroke": "#1D4ED8", "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.05, "y": y - height * 0.22, "width": width * 0.1, "height": height * 0.58, "fill": ribbon, "stroke": ribbon, "strokeWidth": 1}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x, y - height * 0.22, x - width * 0.18, y - height * 0.42, x - width * 0.02, y - height * 0.38, x, y - height * 0.22, x + width * 0.18, y - height * 0.42, x + width * 0.02, y - height * 0.38], "stroke": ribbon, "strokeWidth": 4, "lineCap": "round", "lineJoin": "round"}},
+        ]
+
+    def _template_cake(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#F9A8D4")
+        return [
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.36, "y": y + height * 0.02, "width": width * 0.72, "height": height * 0.28, "fill": fill, "stroke": "#BE185D", "strokeWidth": 2, "cornerRadius": 6}},
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.26, "y": y - height * 0.2, "width": width * 0.52, "height": height * 0.24, "fill": "#FBCFE8", "stroke": "#BE185D", "strokeWidth": 2, "cornerRadius": 6}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.24, y + height * 0.13, x + width * 0.24, y + height * 0.13], "stroke": "#FFFFFF", "strokeWidth": 4, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.03, "y": y - height * 0.38, "width": width * 0.06, "height": height * 0.16, "fill": "#FDE68A", "stroke": "#D97706", "strokeWidth": 1}},
+            {"id": self._next_id(), "type": "circle", "params": {"x": x, "y": y - height * 0.42, "radius": width * 0.035, "fill": "#F97316", "stroke": "#EA580C", "strokeWidth": 1}},
+        ]
+
+    def _template_building(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#334155")
+        children = [
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.42, "y": y - height * 0.48, "width": width * 0.84, "height": height * 0.96, "fill": fill, "stroke": "#0F172A", "strokeWidth": 2}},
+        ]
+        for row in range(4):
+            for col in range(2):
+                children.append({
+                    "id": self._next_id(),
+                    "type": "rect",
+                    "params": {
+                        "x": x - width * 0.24 + col * width * 0.26,
+                        "y": y - height * 0.34 + row * height * 0.18,
+                        "width": width * 0.13,
+                        "height": height * 0.09,
+                        "fill": "#FDE68A",
+                        "stroke": "#FACC15",
+                        "strokeWidth": 1,
+                    },
+                })
+        return children
+
+    def _template_sailboat(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return [
+            {"id": self._next_id(), "type": "polygon", "params": {"points": [x - width * 0.35, y + height * 0.18, x + width * 0.35, y + height * 0.18, x + width * 0.18, y + height * 0.36, x - width * 0.2, y + height * 0.36], "fill": style.get("fill", "#92400E"), "stroke": "#78350F", "strokeWidth": 2, "closed": True}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x, y + height * 0.18, x, y - height * 0.42], "stroke": "#475569", "strokeWidth": 3, "lineCap": "round"}},
+            {"id": self._next_id(), "type": "polygon", "params": {"points": [x, y - height * 0.38, x, y + height * 0.12, x + width * 0.32, y + height * 0.08], "fill": "#FFFFFF", "stroke": "#CBD5E1", "strokeWidth": 2, "closed": True}},
+            {"id": self._next_id(), "type": "polygon", "params": {"points": [x, y - height * 0.32, x, y + height * 0.08, x - width * 0.24, y + height * 0.08], "fill": "#FEE2E2", "stroke": "#FCA5A5", "strokeWidth": 2, "closed": True}},
+        ]
+
+    def _template_fence(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#F8FAFC")
+        stroke = style.get("stroke", "#94A3B8")
+        children = [
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.45, y, x + width * 0.45, y], "stroke": stroke, "strokeWidth": 4}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.45, y + height * 0.18, x + width * 0.45, y + height * 0.18], "stroke": stroke, "strokeWidth": 4}},
+        ]
+        for i in range(6):
+            px = x - width * 0.42 + i * width * 0.17
+            children.append({"id": self._next_id(), "type": "rect", "params": {"x": px, "y": y - height * 0.24, "width": width * 0.055, "height": height * 0.62, "fill": fill, "stroke": stroke, "strokeWidth": 2}})
+        return children
+
+    def _template_desk(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
+        fill = style.get("fill", "#D97706")
+        stroke = style.get("stroke", "#92400E")
+        return [
+            {"id": self._next_id(), "type": "rect", "params": {"x": x - width * 0.38, "y": y - height * 0.18, "width": width * 0.76, "height": height * 0.24, "fill": fill, "stroke": stroke, "strokeWidth": 2}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.28, y + height * 0.06, x - width * 0.34, y + height * 0.38], "stroke": stroke, "strokeWidth": 4}},
+            {"id": self._next_id(), "type": "line", "params": {"points": [x + width * 0.28, y + height * 0.06, x + width * 0.34, y + height * 0.38], "stroke": stroke, "strokeWidth": 4}},
         ]
