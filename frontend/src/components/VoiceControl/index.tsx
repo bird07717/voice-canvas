@@ -7,6 +7,12 @@ import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
 import { isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
+import {
+  buildMoveByUpdates,
+  buildMoveToUpdates,
+  buildScaleAroundCenterUpdates,
+  getObjectBounds as getResolvedObjectBounds,
+} from '@/services/transformEngine'
 import { CanvasCommandContext, CanvasObject, DrawCommand } from '@/types'
 import './VoiceControl.css'
 
@@ -489,6 +495,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
   const summarizeCanvasObject = (obj: CanvasObject) => {
     const bounds = getObjectBounds(obj)
+    const width = obj.params?.width ?? bounds?.width
+    const height = obj.params?.height ?? bounds?.height
 
     return {
       id: obj.id,
@@ -498,73 +506,22 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       text: obj.params?.text,
       x: obj.params?.x ?? bounds?.x,
       y: obj.params?.y ?? bounds?.y,
-      width: obj.params?.width ?? bounds?.width,
-      height: obj.params?.height ?? bounds?.height,
+      width,
+      height,
       radius: obj.params?.radius,
+      fill: obj.params?.fill,
+      stroke: obj.params?.stroke,
+      centerX: bounds ? bounds.x + bounds.width / 2 : undefined,
+      centerY: bounds ? bounds.y + bounds.height / 2 : undefined,
+      area: typeof width === 'number' && typeof height === 'number' ? width * height : undefined,
+      sceneType: obj.params?.sceneType,
+      sceneRole: obj.params?.sceneRole,
+      idHint: obj.params?.idHint,
     }
   }
 
   const getObjectBounds = (obj: CanvasObject) => {
-    const candidates = obj.children || [obj]
-    const boxes = candidates
-      .map((item) => getShapeBounds(item))
-      .filter(Boolean) as Array<{ x: number; y: number; width: number; height: number }>
-
-    if (boxes.length === 0) return null
-
-    const minX = Math.min(...boxes.map((box) => box.x))
-    const minY = Math.min(...boxes.map((box) => box.y))
-    const maxX = Math.max(...boxes.map((box) => box.x + box.width))
-    const maxY = Math.max(...boxes.map((box) => box.y + box.height))
-
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    }
-  }
-
-  const getShapeBounds = (obj: CanvasObject) => {
-    const params = obj.params || {}
-
-    if (typeof params.x === 'number' && typeof params.y === 'number') {
-      if (typeof params.radius === 'number') {
-        return {
-          x: params.x - params.radius,
-          y: params.y - params.radius,
-          width: params.radius * 2,
-          height: params.radius * 2,
-        }
-      }
-
-      if (typeof params.width === 'number' && typeof params.height === 'number') {
-        return {
-          x: params.x,
-          y: params.y,
-          width: params.width,
-          height: params.height,
-        }
-      }
-    }
-
-    if (Array.isArray(params.points) && params.points.length >= 4) {
-      const xs = params.points.filter((_: number, index: number) => index % 2 === 0)
-      const ys = params.points.filter((_: number, index: number) => index % 2 === 1)
-      const minX = Math.min(...xs)
-      const minY = Math.min(...ys)
-      const maxX = Math.max(...xs)
-      const maxY = Math.max(...ys)
-
-      return {
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY,
-      }
-    }
-
-    return null
+    return getResolvedObjectBounds(obj)
   }
 
   const executeControlAction = async (action: 'save' | 'export' | 'cancel' | 'continue') => {
@@ -731,85 +688,19 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const getMoveByUpdates = (targetId: string, dx: number, dy: number) => {
     const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
     if (!obj) return null
-
-    const params = obj.params || {}
-    if (obj.type === 'group') {
-      const bounds = getObjectBounds(obj)
-      if (!bounds) return null
-      return {
-        x: bounds.x + dx,
-        y: bounds.y + dy,
-      }
-    }
-
-    if (Array.isArray(params.points)) {
-      return {
-        points: params.points.map((point: number, index: number) =>
-          index % 2 === 0 ? point + dx : point + dy
-        ),
-      }
-    }
-
-    return {
-      x: (params.x || 0) + dx,
-      y: (params.y || 0) + dy,
-    }
+    return buildMoveByUpdates(obj, dx, dy)
   }
 
   const getMoveToUpdates = (targetId: string, x: number, y: number) => {
     const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
     if (!obj || typeof x !== 'number' || typeof y !== 'number') return null
-
-    const bounds = getObjectBounds(obj)
-    if (!bounds) {
-      return {
-        x,
-        y,
-      }
-    }
-
-    const currentCenterX = bounds.x + bounds.width / 2
-    const currentCenterY = bounds.y + bounds.height / 2
-    return getMoveByUpdates(targetId, x - currentCenterX, y - currentCenterY)
+    return buildMoveToUpdates(obj, x, y)
   }
 
   const getScaleUpdates = (targetId: string, scale: number) => {
     const obj = useCanvasStore.getState().canvasObjects.find((item) => item.id === targetId)
     if (!obj) return null
-
-    const params = obj.params || {}
-    if (obj.type === 'circle') {
-      return { radius: Math.max(8, (params.radius || 50) * scale) }
-    }
-
-    if (obj.type === 'star') {
-      return {
-        innerRadius: Math.max(6, (params.innerRadius || 25) * scale),
-        outerRadius: Math.max(10, (params.outerRadius || 55) * scale),
-      }
-    }
-
-    if (obj.type === 'text') {
-      return { fontSize: Math.max(10, (params.fontSize || 28) * scale) }
-    }
-
-    if (Array.isArray(params.points)) {
-      const xs = params.points.filter((_: number, index: number) => index % 2 === 0)
-      const ys = params.points.filter((_: number, index: number) => index % 2 === 1)
-      const originX = (Math.min(...xs) + Math.max(...xs)) / 2
-      const originY = (Math.min(...ys) + Math.max(...ys)) / 2
-      return {
-        points: params.points.map((point: number, index: number) => {
-          const origin = index % 2 === 0 ? originX : originY
-          return origin + (point - origin) * scale
-        }),
-      }
-    }
-
-    return {
-      width: Math.max(8, (params.width || 120) * scale),
-      height: Math.max(8, (params.height || 80) * scale),
-    }
+    return buildScaleAroundCenterUpdates(obj, scale)
   }
 
   const resolveCommandTarget = (target: string, lastCreatedId: string | null) => {
