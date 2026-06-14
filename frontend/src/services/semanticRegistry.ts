@@ -160,10 +160,10 @@ const inferSpatialSlot = (obj: CanvasContextObject): SpatialSlot | undefined => 
 }
 
 const inferCategory = (obj: CanvasContextObject, base: Partial<ObjectSemanticProfile>) => {
+  if (obj.assetCategory) return obj.assetCategory
   if (base.category && !['shape', 'group', 'object'].includes(base.category)) {
     return base.category
   }
-  if (obj.assetCategory) return obj.assetCategory
   if (obj.sceneRole === 'background') return 'background'
   if (obj.sceneRole === 'decoration') return 'decoration'
   if (obj.sceneRole === 'foreground') return 'foreground'

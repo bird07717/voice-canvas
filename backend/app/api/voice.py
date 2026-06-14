@@ -160,6 +160,8 @@ async def process_voice_command(
             response="",
             reason=llm_response.get("reason"),
             scene=llm_response.get("scene"),
+            needs_disambiguation=bool(llm_response.get("needs_disambiguation")),
+            disambiguation=llm_response.get("disambiguation"),
             chat_history=[]
         )
 
@@ -181,7 +183,9 @@ async def process_voice_command(
             "confidence": llm_response["confidence"],
             "commands": llm_response["commands"],
             "reason": llm_response.get("reason"),
-            "scene": llm_response.get("scene")
+            "scene": llm_response.get("scene"),
+            "needs_disambiguation": bool(llm_response.get("needs_disambiguation")),
+            "disambiguation": llm_response.get("disambiguation"),
         }
     )
     db.add(assistant_message)
@@ -203,6 +207,8 @@ async def process_voice_command(
         response=llm_response["response"],
         reason=llm_response.get("reason"),
         scene=llm_response.get("scene"),
+        needs_disambiguation=bool(llm_response.get("needs_disambiguation")),
+        disambiguation=llm_response.get("disambiguation"),
         chat_history=[ChatMessage.model_validate(msg) for msg in chat_history]
     )
 

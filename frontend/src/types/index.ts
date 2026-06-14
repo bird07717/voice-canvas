@@ -131,6 +131,14 @@ export interface VoiceCommandResponse {
     object_count: number
     layout_notes?: string | null
   }
+  needs_disambiguation?: boolean
+  disambiguation?: {
+    commands?: DrawCommand[]
+    candidates?: Array<{ objectId: string; score: number; reason: string }>
+    interpretation?: string
+    reason?: string
+    intent?: string
+  }
   chat_history: ChatMessage[]
 }
 
