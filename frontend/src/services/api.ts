@@ -2,7 +2,21 @@ import axios, { AxiosInstance, AxiosError } from 'axios'
 import { message } from 'antd'
 import { VoiceCommandRequest, VoiceCommandResponse } from '@/types'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+export const resolveApiUrl = (url?: string | null) => {
+  if (!url) return ''
+
+  if (/^(https?:)?\/\//i.test(url) || /^(data|blob):/i.test(url)) {
+    return url
+  }
+
+  if (url.startsWith('/api/')) {
+    return `${API_BASE_URL.replace(/\/$/, '')}${url}`
+  }
+
+  return url
+}
 
 class ApiService {
   private client: AxiosInstance
