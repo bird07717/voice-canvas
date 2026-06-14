@@ -666,7 +666,16 @@ arguments: {"reason": "忽略原因"}
                 }
 
         except Exception as e:
-            raise Exception(f"LLM API call failed: {str(e)}")
+            return {
+                "intent": "clarify",
+                "confidence": 0.0,
+                "commands": [],
+                "response": "LLM 暂时没有返回可用结果，请稍后重试或换一种更具体的说法。",
+                "reason": f"LLM API call failed: {str(e)}",
+                "llm_route": "tool_plan",
+                "llm_used": True,
+                "routing_reason": decision.reason,
+            }
 
     async def test_connection(
         self,

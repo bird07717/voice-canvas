@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, Dict, Optional
 
 from openai import AsyncOpenAI
@@ -7,6 +8,9 @@ from pydantic import ValidationError
 from app.models.llm_config import LLMConfig
 from app.scene.schemas import ScenePlan
 from app.assets.resolver import AssetResolver
+
+
+logger = logging.getLogger(__name__)
 
 
 class ScenePlanningError(Exception):
@@ -113,14 +117,123 @@ class ScenePlanner:
     }
 
     def _extract_json(self, content: str) -> Dict[str, Any]:
+        normalized = str(content or "").strip()
+        if normalized.startswith("```"):
+            lines = normalized.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            normalized = "\n".join(lines).strip()
+
         try:
-            return json.loads(content)
+            parsed = json.loads(normalized)
         except json.JSONDecodeError:
-            start = content.find("{")
-            end = content.rfind("}")
-            if start == -1 or end == -1 or end <= start:
+            object_start = normalized.find("{")
+            array_start = normalized.find("[")
+            candidates = [start for start in (object_start, array_start) if start >= 0]
+            if not candidates:
                 raise
-            return json.loads(content[start:end + 1])
+
+            start = min(candidates)
+            closing = "}" if normalized[start] == "{" else "]"
+            end = normalized.rfind(closing)
+            if end <= start:
+                raise
+            parsed = json.loads(normalized[start:end + 1])
+
+        if isinstance(parsed, dict):
+            return parsed
+        if isinstance(parsed, list):
+            return {"objects": parsed}
+        raise json.JSONDecodeError("ScenePlanner response is not a JSON object", content, 0)
+
+    def _coerce_scene_plan_payload(self, payload: Dict[str, Any], text: str) -> Dict[str, Any]:
+        if isinstance(payload.get("scene"), dict):
+            nested = dict(payload["scene"])
+            nested.update({key: value for key, value in payload.items() if key not in {"scene"}})
+            payload = nested
+
+        objects = (
+            payload.get("objects")
+            or payload.get("items")
+            or payload.get("elements")
+            or payload.get("scene_objects")
+        )
+
+        coerced = dict(payload)
+        if isinstance(objects, list):
+            coerced["objects"] = [
+                self._coerce_scene_object(obj, index)
+                for index, obj in enumerate(objects)
+                if isinstance(obj, dict)
+            ]
+
+        coerced.setdefault("scene_type", self._scene_type_from_text(text))
+        coerced.setdefault("title", self._title_from_text(text))
+        coerced.setdefault("style", "cartoon_flat")
+        coerced.setdefault("response", f"好的，我规划了{coerced['title']}场景。")
+        return coerced
+
+    def _coerce_scene_object(self, obj: Dict[str, Any], index: int) -> Dict[str, Any]:
+        coerced = dict(obj)
+        coerced["kind"] = str(
+            coerced.get("kind")
+            or coerced.get("type")
+            or coerced.get("name")
+            or coerced.get("object")
+            or "rect"
+        )
+
+        if "render_strategy" not in coerced and "renderStrategy" in coerced:
+            coerced["render_strategy"] = coerced.get("renderStrategy")
+
+        position = coerced.get("position")
+        if not isinstance(position, dict):
+            position = {}
+        if "anchor" not in position:
+            position["anchor"] = "custom" if position.get("x") is not None and position.get("y") is not None else "center"
+        position.setdefault("layer", index + 1)
+        coerced["position"] = position
+
+        size = coerced.get("size")
+        if not isinstance(size, dict):
+            size = {}
+        size.setdefault("preset", "medium")
+        coerced["size"] = size
+
+        style = coerced.get("style")
+        if not isinstance(style, dict):
+            style = {}
+        if "fontSize" in style and "font_size" not in style:
+            style["font_size"] = style["fontSize"]
+        if "verticalAlign" in style and "vertical_align" not in style:
+            style["vertical_align"] = style["verticalAlign"]
+        coerced["style"] = style
+
+        if "label" not in coerced:
+            coerced["label"] = coerced.get("title") or coerced["kind"]
+        return coerced
+
+    def _scene_type_from_text(self, text: str) -> str:
+        raw = "".join(str(text or "").split()).lower()
+        if "赛博朋克" in raw:
+            return "cyberpunk_room"
+        if "书房" in raw:
+            return "study_room"
+        if "办公室" in raw:
+            return "office"
+        if "咖啡馆" in raw:
+            return "cafe"
+        return "open_scene"
+
+    def _title_from_text(self, text: str) -> str:
+        normalized = "".join(str(text or "").split())
+        for prefix in ("请帮我画一个", "请帮我画一幅", "帮我画一个", "帮我画一幅", "画一个", "画一幅", "画个", "生成一个", "创建一个", "来一个", "来个", "做一个", "做个", "画"):
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix):]
+                break
+        return normalized[:16] or "开放场景"
 
     def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:
         if not canvas_context:
@@ -179,18 +292,17 @@ class ScenePlanner:
 
         content = response.choices[0].message.content or ""
         try:
-            result = self._extract_json(content)
+            result = self._coerce_scene_plan_payload(self._extract_json(content), text)
             plan = ScenePlan.model_validate(result)
         except json.JSONDecodeError as exc:
+            logger.warning("ScenePlanner JSON parse failed: %s; content=%s", exc, content[:1000])
             raise ScenePlanningError(
                 "我没能可靠规划这个场景，请换一种说法再试一次。",
                 "Scene Planner 返回内容不是有效 JSON",
             ) from exc
         except ValidationError as exc:
-            raise ScenePlanningError(
-                "我规划出的场景结构不完整，请再描述一次你想画的场景。",
-                "ScenePlan Pydantic 校验失败",
-            ) from exc
+            logger.warning("ScenePlanner validation failed, attempting repair: %s; content=%s", exc, content[:1000])
+            plan = await self._repair_plan(text, content, str(exc), llm_config)
 
         if not plan.objects:
             raise ScenePlanningError(
@@ -199,3 +311,38 @@ class ScenePlanner:
             )
 
         return plan
+
+    async def _repair_plan(
+        self,
+        text: str,
+        invalid_content: str,
+        error: str,
+        llm_config: LLMConfig,
+    ) -> ScenePlan:
+        client = AsyncOpenAI(
+            api_key=llm_config.api_key,
+            base_url=llm_config.base_url,
+        )
+
+        response = await client.chat.completions.create(
+            model=llm_config.model_name,
+            messages=[
+                {"role": "system", "content": "你是 JSON 修复器。只返回一个符合 ScenePlan 结构的严格 JSON object，不要 Markdown。"},
+                {"role": "system", "content": self.SYSTEM_PROMPT},
+                {"role": "system", "content": f"校验错误：{error[:1200]}"},
+                {"role": "system", "content": f"上一版无效输出：{invalid_content[:4000]}"},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.0,
+            max_tokens=3200,
+        )
+
+        content = response.choices[0].message.content or ""
+        try:
+            result = self._coerce_scene_plan_payload(self._extract_json(content), text)
+            return ScenePlan.model_validate(result)
+        except (json.JSONDecodeError, ValidationError) as exc:
+            raise ScenePlanningError(
+                "我规划出的场景结构不完整，请再描述一次你想画的场景。",
+                f"ScenePlan 修复后仍校验失败: {str(exc)[:800]}",
+            ) from exc

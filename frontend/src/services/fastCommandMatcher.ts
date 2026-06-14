@@ -44,6 +44,8 @@ const OPEN_SCENE_REQUEST_PATTERNS = [
   ...SCENE_REQUEST_PATTERNS,
   /场景|一幅|一张/,
   /画面|插画|风景|海报|卡片|房间/,
+  /书房|卧室|厨房|办公室|工作室|实验室|咖啡馆|餐厅|商店|室内/,
+  /赛博朋克|蒸汽朋克|未来感|科幻/,
 ]
 
 const normalizeSceneRequestText = (rawText: string) =>

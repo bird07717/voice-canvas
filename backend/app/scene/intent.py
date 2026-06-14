@@ -17,6 +17,17 @@ SCENE_KEYWORDS = [
     "教室",
     "课堂",
     "客厅",
+    "书房",
+    "卧室",
+    "厨房",
+    "办公室",
+    "工作室",
+    "实验室",
+    "咖啡馆",
+    "餐厅",
+    "商店",
+    "房间",
+    "室内",
     "书桌",
     "工作区",
     "办公桌",
@@ -27,7 +38,25 @@ SCENE_KEYWORDS = [
     "房子和树",
     "天空",
     "草地",
+    "赛博朋克",
 ]
+
+OPEN_SCENE_NOUNS = (
+    "房间",
+    "室内",
+    "书房",
+    "卧室",
+    "厨房",
+    "办公室",
+    "工作室",
+    "实验室",
+    "咖啡馆",
+    "餐厅",
+    "商店",
+    "桌面",
+    "海报",
+    "卡片",
+)
 
 SIMPLE_COMMAND_WORDS = [
     "选中",
@@ -112,7 +141,7 @@ def is_open_scene_request(text: str) -> bool:
     if has_scene_keyword:
         return True
 
-    if any(word in normalized for word in ("房间", "桌面", "海报", "卡片")):
+    if any(word in normalized for word in OPEN_SCENE_NOUNS):
         return True
 
     return False

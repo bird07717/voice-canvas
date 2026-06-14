@@ -34,6 +34,13 @@ class LLMRouterTest(unittest.TestCase):
         self.assertTrue(decision.requires_llm)
         self.assertIsNone(decision.template_scene_plan)
 
+    def test_open_room_scene_without_scene_word_routes_to_scene_planner(self):
+        decision = classify_llm_route("画一个赛博朋克书房")
+
+        self.assertEqual(decision.route, "open_scene")
+        self.assertTrue(decision.requires_llm)
+        self.assertIsNone(decision.template_scene_plan)
+
     def test_complex_non_scene_routes_to_tool_planner(self):
         decision = classify_llm_route("加一只戴帽子的小猫")
 
