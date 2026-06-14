@@ -388,6 +388,40 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         return
       }
 
+      if (response.needs_disambiguation && response.disambiguation?.commands?.length) {
+        const candidates = (response.disambiguation.candidates || [])
+          .map((candidate) => candidate.objectId)
+          .filter(Boolean)
+
+        if (candidates.length) {
+          if (response.scene) {
+            const sceneSetupCommands = response.commands.filter((command) => command.action === 'create')
+            const setupResult = await executeSceneCommands(sceneSetupCommands)
+            if (!setupResult.success) {
+              setStatus('error')
+              setErrorMessage(setupResult.message)
+              setExecutionMessage('')
+              return
+            }
+            recordCommands(sceneSetupCommands)
+          }
+
+          pendingDisambiguationRef.current = {
+            commands: response.disambiguation.commands,
+            candidates,
+            userText: text,
+            interpretation: response.disambiguation.interpretation || response.response || '确认目标对象',
+            createdAt: Date.now(),
+          }
+          setDisambiguationCandidates(candidates)
+          setStatus('matched')
+          setIsProcessing(false)
+          setErrorMessage('')
+          setExecutionMessage(buildDisambiguationPrompt(candidates))
+          return
+        }
+      }
+
       setStatus('drawing')
       if (response.commands.length > 0) {
         const prepared = response.scene
@@ -825,6 +859,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       sceneType: obj.params?.sceneType,
       sceneRole: obj.params?.sceneRole,
       idHint: obj.params?.idHint,
+      assetId: obj.params?.assetId,
+      assetCategory: obj.params?.assetCategory,
+      semanticAliases: Array.isArray(obj.params?.semanticAliases) ? obj.params.semanticAliases : undefined,
     }
   }
 

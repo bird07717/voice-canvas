@@ -2,9 +2,14 @@ from itertools import count
 from typing import Any, Dict, Iterable, List, Optional
 from uuid import uuid4
 
-from app.assets.resolver import AssetResolver
+from app.assets.resolver import AssetResolver, SVGAsset
 from app.drawing.executor import DrawingExecutor
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
+from app.drawing.target_resolver import (
+    PENDING_TARGET,
+    command_context_from_create_commands,
+    resolve_target_query,
+)
 from app.scene.patch import ScenePatchOperation, ScenePatchPlan
 
 
@@ -61,9 +66,13 @@ class ScenePatchExecutor:
         self.drawing_executor = DrawingExecutor(canvas_context)
         self._id_counter = count(1)
         self._id_prefix = f"patch_{uuid4().hex[:8]}"
+        self.needs_disambiguation = False
+        self.disambiguation: Optional[Dict[str, Any]] = None
 
     def execute(self, plan: ScenePatchPlan) -> List[Dict[str, Any]]:
         commands: List[Dict[str, Any]] = []
+        self.needs_disambiguation = False
+        self.disambiguation = None
         for operation in plan.operations:
             if operation.action == "add":
                 commands.extend(self._add(operation))
@@ -84,7 +93,7 @@ class ScenePatchExecutor:
         if render_strategy == "svg":
             asset = self.asset_resolver.resolve(kind, operation.description or operation.label)
             if asset:
-                return [self._create_svg_asset(operation, asset.public_url)]
+                return [self._create_svg_asset(operation, asset)]
             render_strategy = self._default_strategy(kind)
 
         args = CreateObjectArgs(
@@ -115,18 +124,21 @@ class ScenePatchExecutor:
             self._attach_scene_metadata(command, operation, kind)
         return created
 
-    def _create_svg_asset(self, operation: ScenePatchOperation, image_url: str) -> Dict[str, Any]:
+    def _create_svg_asset(self, operation: ScenePatchOperation, asset: SVGAsset) -> Dict[str, Any]:
         x, y = self._position_xy(operation)
         width, height = self._size_wh(operation)
-        kind = (operation.kind or "svg_asset").strip().lower()
+        kind = asset.kind or (operation.kind or "svg_asset").strip().lower()
         params = {
             "x": x - width / 2,
             "y": y - height / 2,
             "width": width,
             "height": height,
-            "imageUrl": image_url,
+            "imageUrl": asset.public_url,
             "kind": kind,
-            "kindLabel": operation.label or operation.kind or "素材",
+            "kindLabel": operation.label or asset.label or operation.kind or "素材",
+            "assetId": asset.asset_id,
+            "assetCategory": asset.category,
+            "semanticAliases": asset.aliases,
             "sceneType": self.scene_type,
             "sceneTitle": self.scene_title,
             "sceneStyle": "cartoon_flat",
@@ -164,18 +176,41 @@ class ScenePatchExecutor:
         if not operation.target:
             return None
 
-        ref = operation.target.ref
-        value = operation.target.value.strip().lower()
-        for command in reversed(self.template_commands):
-            params = command.get("params") or {}
-            candidates = self._target_candidates(command, params)
-            if ref == "id" and str(command.get("id", "")).lower() == value:
-                return command.get("id")
-            if ref == "scene_role" and str(params.get("sceneRole", "")).lower() == value:
-                return command.get("id")
-            if ref in {"kind", "label"} and value in candidates:
-                return command.get("id")
+        query = self._target_query(operation)
+        if query:
+            context = command_context_from_create_commands(self.template_commands)
+            result = resolve_target_query(query, context, operation.action)
+            if result["status"] == "resolved" and result.get("objectId"):
+                return result["objectId"]
+            if result["status"] == "ambiguous" and result.get("candidates"):
+                self.needs_disambiguation = True
+                self.disambiguation = {
+                    "commands": [],
+                    "candidates": result["candidates"],
+                    "interpretation": "确认场景补丁目标",
+                    "reason": result.get("reason"),
+                    "intent": operation.action,
+                }
+                return PENDING_TARGET
+
         return None
+
+    def _target_query(self, operation: ScenePatchOperation) -> Dict[str, Any]:
+        if not operation.target:
+            return {}
+
+        ref = operation.target.ref
+        value = operation.target.value.strip()
+        query: Dict[str, Any] = {"rawText": value}
+        if ref == "id":
+            query["target"] = value
+        elif ref == "kind":
+            query["kind"] = value
+        elif ref == "label":
+            query["label"] = value
+        elif ref == "scene_role":
+            query["role"] = value
+        return query
 
     def _target_candidates(self, command: Dict[str, Any], params: Dict[str, Any]) -> set[str]:
         values: Iterable[Any] = (

@@ -89,6 +89,9 @@ export interface CanvasContextObject {
   sceneType?: string
   sceneRole?: string
   idHint?: string
+  assetId?: string
+  assetCategory?: string
+  semanticAliases?: string[]
 }
 
 export interface CanvasCommandContext {
@@ -127,6 +130,14 @@ export interface VoiceCommandResponse {
     style: string
     object_count: number
     layout_notes?: string | null
+  }
+  needs_disambiguation?: boolean
+  disambiguation?: {
+    commands?: DrawCommand[]
+    candidates?: Array<{ objectId: string; score: number; reason: string }>
+    interpretation?: string
+    reason?: string
+    intent?: string
   }
   chat_history: ChatMessage[]
 }

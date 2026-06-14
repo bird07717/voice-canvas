@@ -298,7 +298,9 @@ arguments: {"reason": "忽略原因"}
                 "confidence": confidence,
                 "commands": [],
                 "response": "",
-                "reason": reason or "低置信度或非绘画相关内容"
+                "reason": reason or "低置信度或非绘画相关内容",
+                "needs_disambiguation": bool(result.get("needs_disambiguation")),
+                "disambiguation": result.get("disambiguation"),
             }
 
         if intent == "clarify":
@@ -311,7 +313,9 @@ arguments: {"reason": "忽略原因"}
             "confidence": confidence,
             "commands": commands,
             "response": response,
-            "reason": reason
+            "reason": reason,
+            "needs_disambiguation": bool(result.get("needs_disambiguation")),
+            "disambiguation": result.get("disambiguation"),
         }
 
     def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:
@@ -444,12 +448,13 @@ arguments: {"reason": "忽略原因"}
                 template_commands=commands,
                 llm_config=config,
             )
-            patch_commands = ScenePatchExecutor(
+            patch_executor = ScenePatchExecutor(
                 scene_type=template_scene_plan.scene_type,
                 scene_title=template_scene_plan.title,
                 template_commands=commands,
                 canvas_context=canvas_context,
-            ).execute(patch_plan)
+            )
+            patch_commands = patch_executor.execute(patch_plan)
         except ScenePatchPlanningError as e:
             scene_payload["patch_status"] = "failed"
             return {
@@ -476,6 +481,15 @@ arguments: {"reason": "忽略原因"}
                 "scene": scene_payload,
             }
 
+        needs_disambiguation = bool(patch_executor.needs_disambiguation and patch_executor.disambiguation)
+        disambiguation = patch_executor.disambiguation if needs_disambiguation else None
+        if disambiguation:
+            disambiguation["commands"] = [
+                command
+                for command in patch_commands
+                if command.get("target") == "__pending_target__"
+            ]
+
         scene_payload.update(
             {
                 "object_count": len(commands) + len(patch_commands),
@@ -488,6 +502,8 @@ arguments: {"reason": "忽略原因"}
             "response": patch_plan.response or f"好的，我在{template_scene_plan.title}模板上应用了额外描述。",
             "reason": "scene_template_patch",
             "scene": scene_payload,
+            "needs_disambiguation": needs_disambiguation,
+            "disambiguation": disambiguation,
         }
 
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
@@ -550,6 +566,8 @@ arguments: {"reason": "忽略原因"}
                 "response": patched["response"],
                 "reason": patched["reason"],
                 "scene": patched["scene"],
+                "needs_disambiguation": bool(patched.get("needs_disambiguation")),
+                "disambiguation": patched.get("disambiguation"),
             }
 
         # 获取LLM配置

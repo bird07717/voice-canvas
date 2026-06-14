@@ -50,6 +50,8 @@ class VoiceCommandResponse(BaseModel):
     response: str
     reason: Optional[str] = None
     scene: Optional[dict] = None
+    needs_disambiguation: bool = False
+    disambiguation: Optional[dict] = None
     chat_history: List[ChatMessage]
 
 

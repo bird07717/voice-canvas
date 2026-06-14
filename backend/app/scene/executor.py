@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.assets.resolver import AssetResolver, SVGAsset
 from app.drawing.executor import DrawingExecutor
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
 from app.scene.schemas import SceneObject, ScenePlan
@@ -90,6 +91,7 @@ class SceneExecutor:
     def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self.canvas_context = canvas_context or {}
         self.drawing_executor = DrawingExecutor(canvas_context)
+        self.asset_resolver = AssetResolver()
         self.anchor_usage: Dict[str, int] = {}
 
     def execute(self, plan: ScenePlan) -> List[Dict[str, Any]]:
@@ -171,6 +173,9 @@ class SceneExecutor:
         kind = self._normalize_kind(scene_object.kind)
         render_strategy = "basic" if kind in BASIC_KINDS else "template"
         if kind not in BASIC_KINDS and kind not in SUPPORTED_TEMPLATE_KINDS:
+            asset = self.asset_resolver.resolve(kind, scene_object.description or scene_object.label)
+            if asset:
+                return [self._create_svg_scene_object(scene_object, plan, asset)]
             kind = "text"
             render_strategy = "basic"
 
@@ -187,6 +192,43 @@ class SceneExecutor:
         for command in commands:
             self._attach_scene_metadata(command, scene_object, plan)
         return commands
+
+    def _create_svg_scene_object(
+        self,
+        scene_object: SceneObject,
+        plan: ScenePlan,
+        asset: SVGAsset,
+    ) -> Dict[str, Any]:
+        x, y = self._resolve_position(scene_object)
+        width, height = self._resolve_size(scene_object)
+        label = scene_object.label or asset.label
+        params = {
+            "x": x - width / 2,
+            "y": y - height / 2,
+            "width": width,
+            "height": height,
+            "imageUrl": asset.public_url,
+            "kind": asset.kind,
+            "kindLabel": label,
+            "assetId": asset.asset_id,
+            "assetCategory": asset.category,
+            "semanticAliases": asset.aliases,
+            "sceneType": plan.scene_type,
+            "sceneTitle": plan.title,
+            "sceneStyle": plan.style,
+            "sceneRole": scene_object.role,
+            "assetSource": "svg",
+        }
+        if scene_object.style.opacity is not None:
+            params["opacity"] = scene_object.style.opacity
+        if scene_object.id_hint:
+            params["idHint"] = scene_object.id_hint
+        return {
+            "action": "create",
+            "type": "image",
+            "id": self.drawing_executor._next_id(),
+            "params": params,
+        }
 
     def _to_position_spec(self, scene_object: SceneObject) -> PositionSpec:
         x, y = self._resolve_position(scene_object)

@@ -2,6 +2,7 @@ from itertools import count
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
+from app.assets.resolver import AssetResolver, SVGAsset
 from app.drawing.schemas import (
     AskClarificationArgs,
     ControlCanvasArgs,
@@ -15,6 +16,7 @@ from app.drawing.schemas import (
     StyleSpec,
     TargetSpec
 )
+from app.drawing.target_resolver import PENDING_TARGET, resolve_target_query
 from app.drawing.tool_parser import intent_from_tool
 
 
@@ -87,6 +89,7 @@ class DrawingExecutor:
         self._id_counter = count(1)
         self._id_prefix = f"obj_{uuid4().hex[:8]}"
         self.canvas_context = canvas_context or {}
+        self.asset_resolver = AssetResolver()
 
     def execute(self, plan: DrawingPlan) -> Dict[str, Any]:
         commands: List[Dict[str, Any]] = []
@@ -94,21 +97,35 @@ class DrawingExecutor:
         confidence = 0.0
         response = plan.response
         reason = plan.reasoning
+        needs_disambiguation = False
+        disambiguation: Optional[Dict[str, Any]] = None
+        pending_index: Optional[int] = None
 
-        for call in plan.calls:
+        for index, call in enumerate(plan.calls):
             intent = intent_from_tool(call.tool)
             confidence = max(confidence, call.confidence)
             args = call.arguments
+
+            if pending_index is not None:
+                continue
 
             if isinstance(args, CreateObjectArgs):
                 commands.extend(self._create_object(args))
             elif isinstance(args, EditObjectArgs):
                 command = self._edit_object(args)
                 if command:
+                    command, disambiguation = self._prepare_command_target(command, "edit")
+                    if disambiguation:
+                        needs_disambiguation = True
+                        pending_index = index
                     commands.append(command)
             elif isinstance(args, DeleteObjectArgs):
                 command = self._delete_object(args)
                 if command:
+                    command, disambiguation = self._prepare_command_target(command, "delete")
+                    if disambiguation:
+                        needs_disambiguation = True
+                        pending_index = index
                     commands.append(command)
             elif isinstance(args, ControlCanvasArgs):
                 command = self._control_canvas(args)
@@ -124,13 +141,17 @@ class DrawingExecutor:
         if commands and intent == "ignore":
             intent = "draw"
 
-        return {
+        result = {
             "intent": intent,
             "confidence": confidence,
             "commands": commands,
             "response": response,
             "reason": reason
         }
+        if needs_disambiguation and disambiguation:
+            result["needs_disambiguation"] = True
+            result["disambiguation"] = disambiguation
+        return result
 
     def _create_object(self, args: CreateObjectArgs) -> List[Dict[str, Any]]:
         kind = args.kind.lower()
@@ -141,6 +162,10 @@ class DrawingExecutor:
 
         if render_strategy == "template" or kind in TEMPLATE_KINDS:
             return [self._create_template(kind, args)]
+
+        asset = self.asset_resolver.resolve(kind, args.description)
+        if asset:
+            return [self._create_svg_asset(args, asset)]
 
         return [self._create_svg_placeholder(args)]
 
@@ -250,6 +275,28 @@ class DrawingExecutor:
             }
         }
 
+    def _create_svg_asset(self, args: CreateObjectArgs, asset: SVGAsset) -> Dict[str, Any]:
+        x, y = self._resolve_position(args.position)
+        width, height = self._resolve_size(args.size)
+        return {
+            "action": "create",
+            "type": "image",
+            "id": self._next_id(),
+            "params": {
+                "x": x - width / 2,
+                "y": y - height / 2,
+                "width": width,
+                "height": height,
+                "imageUrl": asset.public_url,
+                "kind": asset.kind,
+                "kindLabel": asset.label,
+                "assetId": asset.asset_id,
+                "assetCategory": asset.category,
+                "semanticAliases": asset.aliases,
+                "assetSource": "svg",
+            },
+        }
+
     def _edit_object(self, args: EditObjectArgs) -> Optional[Dict[str, Any]]:
         target, target_query = self._target_command_fields(args.target)
         if not target and not target_query:
@@ -322,6 +369,53 @@ class DrawingExecutor:
         if target_query:
             command["targetQuery"] = target_query
         return command
+
+    def _prepare_command_target(
+        self,
+        command: Dict[str, Any],
+        intent: str,
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+        target_query = command.get("targetQuery")
+        if not target_query:
+            return command, None
+
+        action = self._resolve_action_for_command(command)
+        result = resolve_target_query(target_query, self.canvas_context, action)
+        if result["status"] == "resolved" and result.get("objectId"):
+            prepared = dict(command)
+            prepared["target"] = result["objectId"]
+            prepared.pop("targetQuery", None)
+            return prepared, None
+
+        if result["status"] == "ambiguous" and result.get("candidates"):
+            pending_command = dict(command)
+            pending_command["target"] = PENDING_TARGET
+            pending_command.pop("targetQuery", None)
+            return pending_command, {
+                "commands": [pending_command],
+                "candidates": result["candidates"],
+                "interpretation": "确认目标对象",
+                "reason": result.get("reason"),
+                "intent": intent,
+            }
+
+        return command, None
+
+    def _resolve_action_for_command(self, command: Dict[str, Any]) -> str:
+        action = command.get("action")
+        if action == "delete":
+            return "delete"
+        if action in {"move", "moveBy"}:
+            return "move"
+        if action == "scale":
+            return "scale"
+        if action == "select":
+            return "select"
+        if action == "modify":
+            params = command.get("params") or {}
+            if "fill" in params or "stroke" in params:
+                return "recolor"
+        return "edit"
 
     def _control_canvas(self, args: ControlCanvasArgs) -> Optional[Dict[str, Any]]:
         if args.action in {"undo", "redo", "clear"}:
