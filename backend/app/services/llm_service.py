@@ -1,4 +1,5 @@
 import json
+import hashlib
 from typing import Optional, List, Dict, Any
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
 from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
 from app.scene.patch_executor import ScenePatchExecutor
-from app.scene.planner import ScenePlanner, ScenePlanningError
+from app.scene.svg_generator import SvgSceneGenerator
 from app.assets.resolver import AssetResolver
 from app.services.llm_router import classify_llm_route, has_scene_patch_hint
 
@@ -380,32 +381,65 @@ arguments: {"reason": "忽略原因"}
         executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
-    def _execute_scene_plan_response(
+    def _execute_svg_scene_response(
         self,
-        scene_plan: Any,
-        canvas_context: Optional[Dict[str, Any]],
+        svg_scene: Any,
         routing_reason: str,
-        reason: str = "scene_plan",
     ) -> Dict[str, Any]:
-        commands = SceneExecutor(canvas_context).execute(scene_plan)
+        object_id = f"llm_svg_{hashlib.sha1(svg_scene.svg.encode('utf-8')).hexdigest()[:12]}"
+        svg_data_url = self._svg_to_data_url(svg_scene.svg)
+        commands = [
+            {
+                "action": "create",
+                "type": "image",
+                "id": object_id,
+                "params": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 800,
+                    "height": 600,
+                    "imageUrl": svg_data_url,
+                    "kind": "llm_svg_scene",
+                    "kindLabel": svg_scene.title,
+                    "sceneType": svg_scene.scene_type,
+                    "sceneTitle": svg_scene.title,
+                    "sceneStyle": svg_scene.style,
+                    "sceneRole": "full_scene",
+                    "assetSource": svg_scene.source,
+                    "rawSvg": svg_scene.svg,
+                },
+            }
+        ]
         return {
             "intent": "draw",
             "confidence": 0.9,
             "commands": commands,
-            "response": scene_plan.response or f"好的，我规划了{scene_plan.title}场景。",
-            "reason": reason,
+            "response": svg_scene.response,
+            "reason": "svg_scene",
             "llm_route": "open_scene",
             "llm_used": True,
             "routing_reason": routing_reason,
             "scene": {
-                "scene_type": scene_plan.scene_type,
-                "title": scene_plan.title,
-                "style": scene_plan.style,
+                "scene_type": svg_scene.scene_type,
+                "title": svg_scene.title,
+                "style": svg_scene.style,
                 "object_count": len(commands),
-                "layout_notes": scene_plan.layout_notes,
-                "source": scene_plan.source or "llm_open_scene",
+                "layout_notes": svg_scene.layout_notes,
+                "source": svg_scene.source,
+            },
+            "svg_scene": {
+                "scene_type": svg_scene.scene_type,
+                "title": svg_scene.title,
+                "source": svg_scene.source,
+                "svg": svg_scene.svg,
             },
         }
+
+    def _svg_to_data_url(self, svg: str) -> str:
+        import base64
+
+        encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+        return f"data:image/svg+xml;base64,{encoded}"
 
     def _has_scene_patch_hint(self, text: str, scene_title: str, scene_type: str) -> bool:
         return has_scene_patch_hint(text, scene_title, scene_type)
@@ -591,31 +625,12 @@ arguments: {"reason": "忽略原因"}
             }
 
         if decision.route == "open_scene":
-            scene_planner = ScenePlanner()
-            try:
-                scene_plan = await scene_planner.plan(
-                    text,
-                    canvas_context,
-                    config,
-                    asset_resolver=self.asset_resolver,
-                )
-                return self._execute_scene_plan_response(scene_plan, canvas_context, decision.reason)
-            except ScenePlanningError as e:
-                scene_plan = scene_planner.fallback_plan(text, e.reason)
-                return self._execute_scene_plan_response(
-                    scene_plan,
-                    canvas_context,
-                    decision.reason,
-                    reason=f"scene_plan_fallback: {e.reason}",
-                )
-            except Exception as e:
-                scene_plan = scene_planner.fallback_plan(text, f"Scene Planner failed: {str(e)}")
-                return self._execute_scene_plan_response(
-                    scene_plan,
-                    canvas_context,
-                    decision.reason,
-                    reason=f"scene_plan_fallback: {str(e)[:160]}",
-                )
+            svg_scene = await SvgSceneGenerator().generate(
+                text=text,
+                canvas_context=canvas_context,
+                llm_config=config,
+            )
+            return self._execute_svg_scene_response(svg_scene, decision.reason)
 
         # 调用OpenAI API
         client = AsyncOpenAI(
