@@ -137,6 +137,12 @@ export interface VoiceCommandResponse {
     patch_status?: string
     patch_count?: number
   }
+  svg_scene?: {
+    scene_type: string
+    title: string
+    source: string
+    svg?: string
+  }
   needs_disambiguation?: boolean
   disambiguation?: {
     commands?: DrawCommand[]

@@ -163,6 +163,7 @@ async def process_voice_command(
             llm_used=bool(llm_response.get("llm_used")),
             routing_reason=llm_response.get("routing_reason"),
             scene=llm_response.get("scene"),
+            svg_scene=llm_response.get("svg_scene"),
             needs_disambiguation=bool(llm_response.get("needs_disambiguation")),
             disambiguation=llm_response.get("disambiguation"),
             chat_history=[]
@@ -190,6 +191,7 @@ async def process_voice_command(
             "llm_used": bool(llm_response.get("llm_used")),
             "routing_reason": llm_response.get("routing_reason"),
             "scene": llm_response.get("scene"),
+            "svg_scene": llm_response.get("svg_scene"),
             "needs_disambiguation": bool(llm_response.get("needs_disambiguation")),
             "disambiguation": llm_response.get("disambiguation"),
         }
@@ -216,6 +218,7 @@ async def process_voice_command(
         llm_used=bool(llm_response.get("llm_used")),
         routing_reason=llm_response.get("routing_reason"),
         scene=llm_response.get("scene"),
+        svg_scene=llm_response.get("svg_scene"),
         needs_disambiguation=bool(llm_response.get("needs_disambiguation")),
         disambiguation=llm_response.get("disambiguation"),
         chat_history=[ChatMessage.model_validate(msg) for msg in chat_history]

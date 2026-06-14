@@ -58,7 +58,7 @@ const getLLMRouteLabel = (route?: string, llmUsed?: boolean) => {
     case 'template_scene_patch':
       return llmUsed ? '模板 + LLM补丁' : '固定模板，补丁未启用'
     case 'open_scene':
-      return 'LLM开放场景'
+      return 'LLM SVG整图'
     case 'tool_plan':
       return 'LLM工具规划'
     case 'requires_llm':
@@ -178,7 +178,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus,
     setRecognitionType
   } = useVoiceStore()
-  const { activeConfig, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
+  const { activeConfig, setConfigs, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
   const {
     addObject,
     replaceSceneObjects,
@@ -292,6 +292,20 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus('idle')
   }
 
+  const loadActiveLLMConfig = async () => {
+    const currentActiveConfig = useLLMStore.getState().activeConfig
+    if (currentActiveConfig) return currentActiveConfig
+
+    try {
+      const configs = await apiService.getLLMConfigs()
+      setConfigs(configs)
+      return configs.find((config: any) => config.is_active) || null
+    } catch (error) {
+      console.error('刷新LLM配置失败', error)
+      return null
+    }
+  }
+
   const handleVoiceCommand = async (text: string) => {
     const canvasState = useCanvasStore.getState()
     if (!canvasState.currentCanvasId || !text.trim()) return
@@ -379,7 +393,15 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     }
 
     const canUseTemplateScene = isTemplateSceneRequest(text)
-    if (!activeConfig && !canUseTemplateScene) {
+    let resolvedActiveConfig = activeConfig
+    if (!resolvedActiveConfig && !canUseTemplateScene) {
+      setStatus('thinking')
+      setExecutionMessage('正在检查 LLM 模型配置...')
+      resolvedActiveConfig = await loadActiveLLMConfig()
+      if (!isCurrentCommand()) return
+    }
+
+    if (!resolvedActiveConfig && !canUseTemplateScene) {
       setStatus('error')
       setLastCommandSource(null)
       setInterpretedText('需要 AI 理解的复杂命令')
@@ -390,15 +412,15 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
     setStatus('thinking')
     setLastCommandSource('llm')
-    setInterpretedText(activeConfig ? '第三层 LLM 增强正在理解。' : '固定场景模板，后端快速生成。')
-    setExecutionMessage(activeConfig ? 'AI 正在选择场景、补丁或工具规划...' : '正在生成模板场景...')
+    setInterpretedText(resolvedActiveConfig ? '第三层 LLM 增强正在理解。' : '固定场景模板，后端快速生成。')
+    setExecutionMessage(resolvedActiveConfig ? 'AI 正在生成 SVG 场景或编辑画面...' : '正在生成模板场景...')
     setIsProcessing(true)
 
     try {
       const response = await apiService.processVoiceCommand({
         canvas_id: canvasState.currentCanvasId,
         text: text.trim(),
-        llm_config_id: activeConfig?.id,
+        llm_config_id: resolvedActiveConfig?.id,
         canvas_context: canvasContext,
       })
 

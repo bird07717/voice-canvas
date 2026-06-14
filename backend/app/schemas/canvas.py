@@ -53,6 +53,7 @@ class VoiceCommandResponse(BaseModel):
     llm_used: bool = False
     routing_reason: Optional[str] = None
     scene: Optional[dict] = None
+    svg_scene: Optional[dict] = None
     needs_disambiguation: bool = False
     disambiguation: Optional[dict] = None
     chat_history: List[ChatMessage]
