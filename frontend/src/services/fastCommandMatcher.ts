@@ -1,5 +1,5 @@
 import { CanvasCommandContext, DrawCommand } from '@/types'
-import { detectKindQuery, detectSpatialHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
+import { hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
 
 export type FastCommandResult = {
   matched: boolean
@@ -105,8 +105,8 @@ const hasExplicitColor = (text: string) =>
 const getShapeColor = (text: string) =>
   parseColor(text, '#60a5fa')
 
-const findTargetByKind = (text: string, context: CanvasCommandContext) => {
-  if (!detectKindQuery(text) && !detectSpatialHint(text)) return null
+const findSemanticTarget = (text: string, context: CanvasCommandContext) => {
+  if (!hasSemanticTargetHint(text, context)) return null
   return resolveObjectTarget({ rawText: text }, context).objectId
 }
 
@@ -183,7 +183,7 @@ export function matchFastCommand(
     return commandResult('清空画布', [{ action: 'clear' }])
   }
 
-  if (/^(删除|删掉|去掉|移除)(它|这个|选中|当前)?$/.test(text) || /^(删除|删掉|去掉|移除).*(圆|圆形|矩形|长方形|线|星星|文字|房子|树|太阳|云|花|人|车)$/.test(text)) {
+  if (/^(删除|删掉|去掉|移除)(它|这个|选中|当前)?$/.test(text) || (/^(删除|删掉|去掉|移除).+/.test(text) && hasSemanticTargetHint(text, context))) {
     const target = resolveSpokenTarget(text, context)
     if (!target) {
       return {
@@ -196,7 +196,7 @@ export function matchFastCommand(
     return commandResult('删除选中对象', [{ action: 'delete', target }])
   }
 
-  const selectTarget = findTargetByKind(text, context)
+  const selectTarget = findSemanticTarget(text, context)
   if (/^(选中|选择|选一下|点一下|点选).+/.test(text)) {
     const target = selectTarget || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context).objectId : null)
     if (!target) {

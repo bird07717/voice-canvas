@@ -1,43 +1,28 @@
-import { CanvasCommandContext, CanvasContextObject } from '@/types'
+import { CanvasCommandContext } from '@/types'
+import {
+  ObjectSemanticProfile,
+  SpatialSlot,
+  buildObjectProfiles,
+  normalizeQueryText,
+  textMatchesTerm,
+} from './semanticRegistry'
 
 export type TargetQuery = {
   rawText?: string
   target?: string
   kind?: string
   label?: string
-  spatial?: 'left' | 'right' | 'top' | 'bottom' | 'center' | 'largest'
+  category?: string
+  role?: string
+  spatial?: SpatialSlot | 'largest'
 }
 
 export type ResolveResult = {
   objectId: string | null
   confidence: number
   reason: string
+  candidates?: Array<{ objectId: string; score: number; reason: string }>
 }
-
-const KIND_ALIASES: Array<{ pattern: RegExp; kinds: string[]; labels: string[] }> = [
-  { pattern: /圆|圆形/, kinds: ['circle', 'round'], labels: ['圆形'] },
-  { pattern: /矩形|长方形|方块|方形|正方形/, kinds: ['rect', 'rectangle', 'square'], labels: ['矩形', '方形'] },
-  { pattern: /线|直线|线条/, kinds: ['line'], labels: ['线条'] },
-  { pattern: /星星|五角星/, kinds: ['star'], labels: ['星星'] },
-  { pattern: /文字|文本|字/, kinds: ['text'], labels: ['文字'] },
-  { pattern: /蛋糕/, kinds: ['cake'], labels: ['蛋糕', '生日蛋糕'] },
-  { pattern: /气球/, kinds: ['balloon'], labels: ['气球'] },
-  { pattern: /礼物/, kinds: ['gift'], labels: ['礼物'] },
-  { pattern: /长椅|椅子|凳子/, kinds: ['bench'], labels: ['长椅', '椅子'] },
-  { pattern: /房子|小屋/, kinds: ['house'], labels: ['房子', '小屋'] },
-  { pattern: /树|树木/, kinds: ['tree', 'palm_tree'], labels: ['树', '椰子树'] },
-  { pattern: /太阳|落日/, kinds: ['sun', 'circle'], labels: ['太阳', '落日'] },
-  { pattern: /云/, kinds: ['cloud'], labels: ['云'] },
-  { pattern: /花/, kinds: ['flower'], labels: ['花'] },
-  { pattern: /人|小人|老师/, kinds: ['person'], labels: ['小人', '老师'] },
-  { pattern: /车|汽车/, kinds: ['car'], labels: ['汽车'] },
-  { pattern: /山|山峰/, kinds: ['mountain'], labels: ['山'] },
-  { pattern: /草|草地/, kinds: ['grass'], labels: ['草地'] },
-  { pattern: /路|道路|小路/, kinds: ['road'], labels: ['道路', '小路'] },
-  { pattern: /河|河流|海|海面/, kinds: ['river'], labels: ['河流', '海面'] },
-  { pattern: /背景|天空/, kinds: ['background'], labels: ['背景', '天空'] },
-  { pattern: /地面|沙滩/, kinds: ['ground', 'rect'], labels: ['地面', '沙滩'] },
-]
 
 export const detectSpatialHint = (text: string): TargetQuery['spatial'] => {
   if (/最大|最大的|最宽|最大的那个/.test(text)) return 'largest'
@@ -49,53 +34,14 @@ export const detectSpatialHint = (text: string): TargetQuery['spatial'] => {
   return undefined
 }
 
-export const detectKindQuery = (text: string) => {
-  return KIND_ALIASES.find((alias) => alias.pattern.test(text)) || null
-}
-
-const objectMatches = (
-  obj: CanvasContextObject,
-  query: { kinds?: string[]; labels?: string[]; kind?: string; label?: string }
-) => {
-  const type = String(obj.type || '').toLowerCase()
-  const kind = String(obj.kind || '').toLowerCase()
-  const kindLabel = String(obj.kindLabel || '')
-  const text = String(obj.text || '')
-
-  if (query.kind && (type === query.kind || kind === query.kind)) return true
-  if (query.label && (kindLabel.includes(query.label) || text.includes(query.label))) return true
-  if (query.kinds?.some((item) => type === item || kind === item)) return true
-  if (query.labels?.some((item) => kindLabel.includes(item) || text.includes(item))) return true
-
-  return false
-}
-
-const areaOf = (obj: CanvasContextObject) =>
-  Math.max(0, obj.width || 0) * Math.max(0, obj.height || 0)
-
-const pickBySpatial = (
-  objects: CanvasContextObject[],
-  spatial: TargetQuery['spatial']
-) => {
-  if (!objects.length) return null
-  if (!spatial) return [...objects].reverse()[0]
-
-  const withPosition = objects.filter((obj) => typeof obj.x === 'number' && typeof obj.y === 'number')
-  const candidates = withPosition.length ? withPosition : objects
-
-  if (spatial === 'left') return [...candidates].sort((a, b) => (a.x ?? 0) - (b.x ?? 0))[0]
-  if (spatial === 'right') return [...candidates].sort((a, b) => (b.x ?? 0) - (a.x ?? 0))[0]
-  if (spatial === 'top') return [...candidates].sort((a, b) => (a.y ?? 0) - (b.y ?? 0))[0]
-  if (spatial === 'bottom') return [...candidates].sort((a, b) => (b.y ?? 0) - (a.y ?? 0))[0]
-  if (spatial === 'largest') return [...candidates].sort((a, b) => areaOf(b) - areaOf(a))[0]
-
-  return [...candidates].sort((a, b) => {
-    const ax = (a.x ?? 400) + (a.width ?? 0) / 2
-    const ay = (a.y ?? 300) + (a.height ?? 0) / 2
-    const bx = (b.x ?? 400) + (b.width ?? 0) / 2
-    const by = (b.y ?? 300) + (b.height ?? 0) / 2
-    return Math.abs(ax - 400) + Math.abs(ay - 300) - (Math.abs(bx - 400) + Math.abs(by - 300))
-  })[0]
+export const hasSemanticTargetHint = (text: string, context: CanvasCommandContext) => {
+  const queryText = normalizeQueryText(text)
+  if (!queryText) return false
+  if (detectSpatialHint(queryText)) return true
+  return buildObjectProfiles(context).some((profile) =>
+    profile.aliases.some((alias) => textMatchesTerm(queryText, alias))
+    || profile.attributes.some((attribute) => textMatchesTerm(queryText, attribute))
+  )
 }
 
 export const resolveContextTarget = (context: CanvasCommandContext): ResolveResult => {
@@ -113,6 +59,71 @@ export const resolveContextTarget = (context: CanvasCommandContext): ResolveResu
   }
 }
 
+const scoreProfile = (
+  profile: ObjectSemanticProfile,
+  query: TargetQuery,
+  context: CanvasCommandContext,
+  maxArea: number
+) => {
+  const text = normalizeQueryText(query.rawText || query.target || '')
+  const spatial = query.spatial || detectSpatialHint(text)
+  const reasons: string[] = []
+  let score = 0
+
+  if (query.kind && profile.kind === query.kind) {
+    score += 45
+    reasons.push('kind')
+  }
+  if (query.category && profile.category === query.category) {
+    score += 32
+    reasons.push('category')
+  }
+  if (query.role && profile.role === query.role) {
+    score += 28
+    reasons.push('role')
+  }
+  if (query.label && profile.aliases.some((alias) => textMatchesTerm(query.label || '', alias))) {
+    score += 48
+    reasons.push('label')
+  }
+
+  const aliasHits = profile.aliases.filter((alias) => textMatchesTerm(text, alias))
+  if (aliasHits.length) {
+    score += Math.min(70, 38 + aliasHits.length * 8)
+    reasons.push(`alias:${aliasHits.slice(0, 2).join('/')}`)
+  }
+
+  const attributeHits = profile.attributes.filter((attribute) => textMatchesTerm(text, attribute))
+  if (attributeHits.length) {
+    score += Math.min(28, attributeHits.length * 10)
+    reasons.push(`attribute:${attributeHits.slice(0, 2).join('/')}`)
+  }
+
+  if (spatial === 'largest') {
+    if (profile.area > 0 && profile.area === maxArea) {
+      score += 26
+      reasons.push('largest')
+    }
+  } else if (spatial && profile.spatialSlot === spatial) {
+    score += 24
+    reasons.push(`spatial:${spatial}`)
+  }
+
+  if (profile.objectId === context.selectedObjectId) {
+    score += 14
+    reasons.push('selected')
+  } else if (profile.objectId === context.lastModifiedObjectId || profile.objectId === context.lastCreatedObjectId) {
+    score += 8
+    reasons.push('recent')
+  }
+
+  return {
+    profile,
+    score,
+    reason: reasons.join(', ') || 'no semantic match',
+  }
+}
+
 export const resolveObjectTarget = (
   query: TargetQuery,
   context: CanvasCommandContext
@@ -123,32 +134,25 @@ export const resolveObjectTarget = (
     return resolveContextTarget(context)
   }
 
-  const alias = detectKindQuery(text)
-  const spatial = query.spatial || detectSpatialHint(text)
-  const matchedObjects = context.objects.filter((obj) =>
-    objectMatches(obj, {
-      kinds: alias?.kinds,
-      labels: alias?.labels,
-      kind: query.kind,
-      label: query.label,
-    })
-  )
+  const profiles = buildObjectProfiles(context)
+  const maxArea = Math.max(...profiles.map((profile) => profile.area || 0), 0)
+  const ranked = profiles
+    .map((profile) => scoreProfile(profile, query, context, maxArea))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+  const candidates = ranked.slice(0, 5).map((item) => ({
+    objectId: item.profile.objectId,
+    score: item.score,
+    reason: item.reason,
+  }))
 
-  if (matchedObjects.length) {
-    const picked = pickBySpatial(matchedObjects, spatial)
+  if (ranked.length) {
+    const picked = ranked[0]
     return {
-      objectId: picked?.id || null,
-      confidence: picked ? (matchedObjects.length === 1 && !spatial ? 0.92 : 0.84) : 0,
-      reason: spatial ? `按对象类型和空间位置匹配：${spatial}` : '按对象类型匹配',
-    }
-  }
-
-  if (spatial) {
-    const picked = pickBySpatial(context.objects, spatial)
-    return {
-      objectId: picked?.id || null,
-      confidence: picked ? 0.58 : 0,
-      reason: `未找到明确类型，按空间位置匹配：${spatial}`,
+      objectId: picked.profile.objectId,
+      confidence: Math.min(0.96, picked.score / 100),
+      reason: picked.reason,
+      candidates,
     }
   }
 
