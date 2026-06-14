@@ -175,6 +175,7 @@ export default function CanvasBoard() {
   const {
     canvasObjects,
     selectedObjectId,
+    disambiguationCandidateIds,
     setStageRef,
     updateObject,
     setSelectedObjectId,
@@ -212,6 +213,18 @@ export default function CanvasBoard() {
 
   const selectedObject = canvasObjects.find((obj) => obj.id === selectedObjectId) || null
   const selectedBounds = selectedObject ? getShapeBounds(selectedObject) : null
+  const disambiguationCandidates = disambiguationCandidateIds
+    .map((id, index) => {
+      const obj = canvasObjects.find((item) => item.id === id)
+      const bounds = obj ? getShapeBounds(obj) : null
+      return obj && bounds ? { id, index, obj, bounds } : null
+    })
+    .filter(Boolean) as Array<{
+      id: string
+      index: number
+      obj: CanvasObject
+      bounds: { x: number; y: number; width: number; height: number }
+    }>
 
   const handleDragEnd = (obj: CanvasObject, event: any) => {
     const node = event.target
@@ -335,6 +348,41 @@ export default function CanvasBoard() {
         >
           <Layer>
             {canvasObjects.map((obj) => renderObject(obj))}
+            {disambiguationCandidates.map((candidate) => (
+              <Group key={`candidate-${candidate.id}`} listening={false}>
+                <Rect
+                  x={candidate.bounds.x - 10}
+                  y={candidate.bounds.y - 10}
+                  width={candidate.bounds.width + 20}
+                  height={candidate.bounds.height + 20}
+                  stroke="#f97316"
+                  strokeWidth={3}
+                  dash={[7, 5]}
+                  cornerRadius={6}
+                  shadowColor="#f97316"
+                  shadowBlur={8}
+                  shadowOpacity={0.22}
+                />
+                <Circle
+                  x={candidate.bounds.x - 10}
+                  y={candidate.bounds.y - 10}
+                  radius={13}
+                  fill="#f97316"
+                  stroke="#ffffff"
+                  strokeWidth={2}
+                />
+                <Text
+                  x={candidate.bounds.x - 16}
+                  y={candidate.bounds.y - 18}
+                  width={12}
+                  align="center"
+                  text={String(candidate.index + 1)}
+                  fontSize={14}
+                  fontStyle="bold"
+                  fill="#ffffff"
+                />
+              </Group>
+            ))}
             {selectedBounds && (
               <>
                 <Rect
