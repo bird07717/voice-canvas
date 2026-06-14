@@ -26,10 +26,8 @@ app.include_router(canvas.router)
 app.include_router(voice.router)
 app.include_router(llm.router)
 
-svg_asset_dir = Path(__file__).resolve().parent / "assets" / "svg"
-svg_asset_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/api/assets/svg", StaticFiles(directory=svg_asset_dir), name="svg-assets")
-app.mount("/api/assets/library", StaticFiles(directory=svg_asset_dir), name="svg-asset-library")
+# SVG资源已迁移到前端public/svg-assets目录统一管理
+# 前端直接通过 /svg-assets/{path} 访问，无需后端挂载
 
 
 @app.get("/")

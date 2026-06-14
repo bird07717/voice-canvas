@@ -622,7 +622,8 @@ arguments: {"reason": "忽略原因"}
         # 调用OpenAI API
         client = AsyncOpenAI(
             api_key=config.api_key,
-            base_url=config.base_url
+            base_url=config.base_url,
+            timeout=60.0  # 设置60秒超时
         )
 
         try:
@@ -634,7 +635,8 @@ arguments: {"reason": "忽略原因"}
                     {"role": "user", "content": text}
                 ],
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=2000,
+                timeout=60.0  # 设置60秒超时
             )
 
             content = response.choices[0].message.content
@@ -668,7 +670,8 @@ arguments: {"reason": "忽略原因"}
         try:
             client = AsyncOpenAI(
                 api_key=api_key,
-                base_url=base_url
+                base_url=base_url,
+                timeout=30.0  # 测试连接使用30秒超时
             )
 
             response = await client.chat.completions.create(
@@ -677,7 +680,8 @@ arguments: {"reason": "忽略原因"}
                     {"role": "user", "content": "Reply with exactly: OK"}
                 ],
                 temperature=0,
-                max_tokens=50
+                max_tokens=50,
+                timeout=30.0  # 测试连接使用30秒超时
             )
 
             content = response.choices[0].message.content or ""

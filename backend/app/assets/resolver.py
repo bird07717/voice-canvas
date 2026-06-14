@@ -9,10 +9,9 @@ import re
 APP_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = APP_ROOT.parent
 PROJECT_ROOT = BACKEND_ROOT.parent
-BACKEND_SVG_ASSET_ROOT = APP_ROOT / "assets" / "svg"
 
+# SVG资源统一存放在前端public目录，便于管理
 DEFAULT_ASSET_ROOTS = [
-    BACKEND_SVG_ASSET_ROOT,
     PROJECT_ROOT / "frontend" / "public" / "svg-assets",
 ]
 
@@ -57,10 +56,13 @@ def _tokens(text: str) -> List[str]:
 
 
 def _public_url(root: Path, file_path: Path) -> str:
+    """生成SVG资源的public URL
+
+    所有SVG资源统一存放在前端public/svg-assets目录
+    URL格式: /svg-assets/{relative_path}
+    """
     relative = file_path.relative_to(root).as_posix()
-    if root.resolve().as_posix().endswith("/frontend/public/svg-assets"):
-        return f"/svg-assets/{relative}"
-    return f"/api/assets/svg/{relative}"
+    return f"/svg-assets/{relative}"
 
 
 def _load_manifest(root: Path) -> Dict[str, Dict[str, Any]]:
