@@ -509,6 +509,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       width,
       height,
       radius: obj.params?.radius,
+      fill: obj.params?.fill,
+      stroke: obj.params?.stroke,
       centerX: bounds ? bounds.x + bounds.width / 2 : undefined,
       centerY: bounds ? bounds.y + bounds.height / 2 : undefined,
       area: typeof width === 'number' && typeof height === 'number' ? width * height : undefined,
