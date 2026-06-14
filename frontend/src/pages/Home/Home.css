@@ -162,106 +162,30 @@
   mask-image: linear-gradient(90deg, transparent 0%, black 28%, black 100%);
 }
 
-.home-workbench::after {
-  position: absolute;
-  top: 22px;
-  right: 28px;
-  bottom: 26px;
-  width: min(48%, 560px);
-  z-index: 0;
-  content: '';
-  pointer-events: none;
-  border: 1px solid rgba(191, 219, 254, 0.34);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(224, 242, 254, 0.18));
-  opacity: 0.46;
-}
-
 .workbench-ambient {
   position: absolute;
-  top: 72px;
-  right: 44px;
+  right: 42px;
+  bottom: 38px;
   z-index: 0;
-  width: min(43%, 500px);
-  height: 280px;
+  width: 132px;
+  height: 54px;
   pointer-events: none;
-  opacity: 0.78;
-}
-
-.ambient-sketch {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.ambient-gridline {
-  fill: none;
-  stroke: rgba(37, 99, 235, 0.08);
-  stroke-width: 1.2;
-}
-
-.ambient-wave {
-  fill: none;
-  stroke: rgba(96, 165, 250, 0.26);
-  stroke-width: 8;
-  stroke-linecap: round;
-  stroke-dasharray: 16 18;
-}
-
-.ambient-cloud {
-  fill: rgba(219, 234, 254, 0.3);
-  stroke: rgba(147, 197, 253, 0.34);
-  stroke-width: 3;
-}
-
-.ambient-roof {
-  fill: rgba(248, 113, 113, 0.22);
-  stroke: rgba(252, 165, 165, 0.35);
-  stroke-width: 3;
-  stroke-linejoin: round;
-}
-
-.ambient-house {
-  fill: rgba(103, 232, 249, 0.2);
-  stroke: rgba(125, 211, 252, 0.34);
-  stroke-width: 3;
-}
-
-.ambient-sun {
-  fill: rgba(250, 204, 21, 0.28);
-  stroke: rgba(253, 224, 71, 0.38);
-  stroke-width: 3;
-}
-
-.ambient-trunk {
-  fill: rgba(180, 83, 9, 0.18);
-}
-
-.ambient-tree {
-  fill: rgba(34, 197, 94, 0.22);
-  stroke: rgba(74, 222, 128, 0.32);
-  stroke-width: 3;
-}
-
-.ambient-tree-light {
-  fill: rgba(74, 222, 128, 0.18);
 }
 
 .ambient-voice {
-  position: absolute;
-  right: 34px;
-  bottom: 24px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  height: 34px;
-  padding: 0 14px;
+  width: 100%;
+  height: 100%;
+  padding: 0 18px;
   border: 1px solid rgba(255, 255, 255, 0.54);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.36);
-  box-shadow: 0 12px 34px rgba(37, 99, 235, 0.08);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 14px 36px rgba(37, 99, 235, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -618,7 +542,6 @@
     border-radius: 20px;
   }
 
-  .home-workbench::after,
   .workbench-ambient {
     display: none;
   }

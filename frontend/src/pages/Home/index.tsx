@@ -148,30 +148,6 @@ export default function Home() {
         <Content className="home-content">
           <div className="home-workbench">
             <div className="workbench-ambient" aria-hidden="true">
-              <svg className="ambient-sketch" viewBox="0 0 460 280">
-                <path
-                  className="ambient-gridline"
-                  d="M24 54H436M24 102H436M24 150H436M24 198H436M24 246H436"
-                />
-                <path
-                  className="ambient-gridline"
-                  d="M70 24V256M122 24V256M174 24V256M226 24V256M278 24V256M330 24V256M382 24V256"
-                />
-                <path
-                  className="ambient-wave"
-                  d="M58 214c54-25 112-28 174-8 62 20 118 16 168-20"
-                />
-                <path
-                  className="ambient-cloud"
-                  d="M94 86h58c10 0 18-7 18-16s-8-16-18-16c-4 0-7 1-10 3-6-10-16-16-28-16-17 0-31 13-31 29 0 6 1 11 4 16h7Z"
-                />
-                <path className="ambient-roof" d="M178 154l48-39 48 39Z" />
-                <rect className="ambient-house" x="191" y="154" width="70" height="54" rx="8" />
-                <circle className="ambient-sun" cx="354" cy="72" r="21" />
-                <rect className="ambient-trunk" x="326" y="156" width="16" height="48" rx="5" />
-                <circle className="ambient-tree" cx="334" cy="135" r="31" />
-                <circle className="ambient-tree ambient-tree-light" cx="362" cy="143" r="22" />
-              </svg>
               <div className="ambient-voice">
                 <span />
                 <span />
