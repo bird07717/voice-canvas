@@ -44,6 +44,7 @@ const CANVAS_HEIGHT = 600
 const PRECISE_MATCH_GAP = 18
 const SPATIAL_TIE_GAP = 24
 const LARGE_AREA_TIE_RATIO = 0.08
+const MULTI_TARGET_MIN_SCORE = 78
 
 type RankedTargetCandidate = {
   profile: ObjectSemanticProfile
@@ -55,6 +56,11 @@ const hasContextReference = (text: string) =>
   /它|这个|刚才|最后|上一个/.test(text)
   || /当前(对象|图形)?$/.test(text)
   || /选中(的|对象|图形)?$/.test(text)
+
+const hasExplicitTargetQualifier = (text: string, spatial: TargetQuery['spatial']) =>
+  Boolean(spatial)
+  || hasContextReference(text)
+  || /第[一二三四五12345]个|[一二三四五12345]号|左边|右边|上面|下面|中间|最大|最小/.test(text)
 
 const hasTargetActionPrefix = (text: string) =>
   /^(选中|选择|选一下|点一下|点选|删除|删掉|去掉|移除)/.test(text)
@@ -309,9 +315,23 @@ const spatialWinnerIsDistinct = (
 
 const resolveFromPreciseCandidates = (
   ranked: RankedTargetCandidate[],
-  spatial: TargetQuery['spatial']
+  spatial: TargetQuery['spatial'],
+  normalizedText = ''
 ): ResolveResult => {
   const scoreRanked = [...ranked].sort((a, b) => b.score - a.score)
+
+  if (!hasExplicitTargetQualifier(normalizedText, spatial)) {
+    const sameTargetPool = scoreRanked.filter((item) => item.score >= MULTI_TARGET_MIN_SCORE)
+    if (sameTargetPool.length > 1) {
+      return {
+        objectId: null,
+        confidence: 0.74,
+        status: 'ambiguous',
+        reason: '找到多个同类目标，需要用户确认',
+        candidates: toResolveCandidates(sameTargetPool),
+      }
+    }
+  }
 
   if (spatial && scoreRanked.length > 1) {
     const topScore = scoreRanked[0].score
@@ -381,7 +401,7 @@ const resolveSpatialOnlyTarget = (
 
   if (!candidates.length) return null
 
-  return resolveFromPreciseCandidates(candidates, spatial)
+  return resolveFromPreciseCandidates(candidates, spatial, normalizedText)
 }
 
 const resolvePreciseTarget = (
@@ -411,7 +431,7 @@ const resolvePreciseTarget = (
     .filter(Boolean) as RankedTargetCandidate[]
 
   if (ranked.length) {
-    return resolveFromPreciseCandidates(ranked, spatial)
+    return resolveFromPreciseCandidates(ranked, spatial, normalizedText)
   }
 
   if (spatial && hasTargetActionPrefix(normalizedText)) {

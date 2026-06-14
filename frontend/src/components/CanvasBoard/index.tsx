@@ -223,7 +223,20 @@ export default function CanvasBoard() {
     .map((id, index) => {
       const obj = canvasObjects.find((item) => item.id === id)
       const bounds = obj ? getShapeBounds(obj) : null
-      return obj && bounds ? { id, index, obj, bounds } : null
+      if (!obj || !bounds) return null
+      const width = Math.max(28, bounds.width)
+      const height = Math.max(28, bounds.height)
+      return {
+        id,
+        index,
+        obj,
+        bounds: {
+          x: bounds.x + (bounds.width - width) / 2,
+          y: bounds.y + (bounds.height - height) / 2,
+          width,
+          height,
+        },
+      }
     })
     .filter(Boolean) as Array<{
       id: string

@@ -11,8 +11,21 @@ CANVAS_HEIGHT = 600
 PRECISE_MATCH_GAP = 18
 SPATIAL_TIE_GAP = 24
 LARGE_AREA_TIE_RATIO = 0.08
+MULTI_TARGET_MIN_SCORE = 78
 
 PENDING_TARGET = "__pending_target__"
+
+
+def has_context_reference(text: str) -> bool:
+    return bool(re.search(r"它|这个|刚才|最后|上一个|当前(对象|图形)?$|选中(的|对象|图形)?$", text or ""))
+
+
+def has_explicit_target_qualifier(text: str, spatial: Optional[str]) -> bool:
+    return bool(
+        spatial
+        or has_context_reference(text)
+        or re.search(r"第[一二三四五12345]个|[一二三四五12345]号|左边|右边|上面|下面|中间|最大|最小", text or "")
+    )
 
 BASE_KIND_PROFILES: Dict[str, Dict[str, Any]] = {
     "circle": {"category": "shape", "aliases": ["圆", "圆形", "圈"]},
@@ -579,8 +592,27 @@ def candidate_payload(candidates: List[RankedCandidate]) -> List[Dict[str, Any]]
     ]
 
 
-def resolve_from_candidates(candidates: List[RankedCandidate], spatial: Optional[str]) -> Dict[str, Any]:
+def resolve_from_candidates(
+    candidates: List[RankedCandidate],
+    spatial: Optional[str],
+    normalized_text: str = "",
+) -> Dict[str, Any]:
     score_ranked = sorted(candidates, key=lambda item: item.score, reverse=True)
+    if not has_explicit_target_qualifier(normalized_text, spatial):
+        same_target_pool = [
+            item
+            for item in score_ranked
+            if item.score >= MULTI_TARGET_MIN_SCORE
+        ]
+        if len(same_target_pool) > 1:
+            return {
+                "status": "ambiguous",
+                "objectId": None,
+                "confidence": 0.74,
+                "reason": "找到多个同类目标，需要用户确认",
+                "candidates": candidate_payload(same_target_pool),
+            }
+
     if spatial and len(score_ranked) > 1:
         top_score = score_ranked[0].score
         runner_up_score = score_ranked[1].score
@@ -655,7 +687,7 @@ def resolve_target_query(
     ]
 
     if ranked:
-        return resolve_from_candidates(ranked, spatial)
+        return resolve_from_candidates(ranked, spatial, normalized_text)
 
     if spatial:
         spatial_candidates = [
@@ -663,7 +695,7 @@ def resolve_target_query(
             for profile in profiles
         ]
         if spatial_candidates:
-            return resolve_from_candidates(spatial_candidates, spatial)
+            return resolve_from_candidates(spatial_candidates, spatial, normalized_text)
 
     return {
         "status": "not_found",
