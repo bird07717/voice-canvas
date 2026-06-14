@@ -1,3 +1,13 @@
+export interface CommandTargetQuery {
+  rawText?: string
+  target?: string
+  kind?: string
+  label?: string
+  category?: string
+  role?: string
+  spatial?: 'left' | 'right' | 'top' | 'bottom' | 'center' | 'largest'
+}
+
 // 绘图命令类型定义
 export interface DrawCommand {
   action:
@@ -14,6 +24,7 @@ export interface DrawCommand {
   type?: string
   id?: string
   target?: string
+  targetQuery?: CommandTargetQuery
   params?: any
   children?: any[]
 }

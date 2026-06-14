@@ -59,6 +59,11 @@ class TargetSpec(BaseModel):
     ref: Literal["last", "selected", "kind", "id"] = "last"
     id: Optional[str] = None
     kind: Optional[str] = None
+    label: Optional[str] = None
+    category: Optional[str] = None
+    role: Optional[str] = None
+    spatial: Optional[Literal["left", "right", "top", "bottom", "center", "largest"]] = None
+    raw_text: Optional[str] = None
 
 
 class CreateObjectArgs(BaseModel):

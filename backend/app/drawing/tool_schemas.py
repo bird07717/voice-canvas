@@ -208,7 +208,15 @@ COMMON_PARAMETER_DEFS: Dict[str, Any] = {
                 "enum": ["last", "selected", "kind", "id"]
             },
             "id": {"type": "string"},
-            "kind": {"type": "string"}
+            "kind": {"type": "string"},
+            "label": {"type": "string"},
+            "category": {"type": "string"},
+            "role": {"type": "string"},
+            "spatial": {
+                "type": "string",
+                "enum": ["left", "right", "top", "bottom", "center", "largest"]
+            },
+            "raw_text": {"type": "string"}
         }
     }
 }

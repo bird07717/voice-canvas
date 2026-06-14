@@ -7,6 +7,7 @@ import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
 import { PENDING_TARGET, isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
+import { ResolveAction, resolveObjectTarget } from '@/services/objectResolver'
 import {
   buildMoveByUpdates,
   buildMoveToUpdates,
@@ -37,6 +38,11 @@ type PendingDisambiguation = {
   interpretation: string
   createdAt: number
 }
+
+type PreparedCommandsResult =
+  | { status: 'ready'; commands: DrawCommand[] }
+  | { status: 'pending' }
+  | { status: 'error'; message: string }
 
 const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
 const DISAMBIGUATION_TIMEOUT_MS = 30000
@@ -384,16 +390,36 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
       setStatus('drawing')
       if (response.commands.length > 0) {
+        const prepared = response.scene
+          ? { status: 'ready' as const, commands: response.commands }
+          : prepareCommandsWithTargetQueries(
+              response.commands,
+              canvasContext,
+              text,
+              response.response || 'AI 编辑命令'
+            )
+        if (prepared.status === 'pending') {
+          setStatus('matched')
+          setIsProcessing(false)
+          return
+        }
+        if (prepared.status === 'error') {
+          setStatus('error')
+          setErrorMessage(prepared.message)
+          setExecutionMessage('')
+          return
+        }
+
         const result = response.scene
-          ? await executeSceneCommands(response.commands)
-          : executeCommands(response.commands)
+          ? await executeSceneCommands(prepared.commands)
+          : executeCommands(prepared.commands)
         if (!result.success) {
           setStatus('error')
           setErrorMessage(result.message)
           setExecutionMessage('')
           return
         }
-        recordCommands(response.commands)
+        recordCommands(prepared.commands)
       }
       if (response.response) {
         setInterpretedText(response.scene ? `理解为：${response.scene.title}场景` : response.response)
@@ -528,6 +554,87 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     clearDisambiguationCandidates()
   }
 
+  const prepareCommandsWithTargetQueries = (
+    commands: DrawCommand[],
+    context: CanvasCommandContext,
+    userText: string,
+    interpretation: string
+  ): PreparedCommandsResult => {
+    const preparedCommands: DrawCommand[] = []
+
+    for (const [index, command] of commands.entries()) {
+      if (!command.targetQuery) {
+        preparedCommands.push(command)
+        continue
+      }
+
+      const action = getResolveActionForCommand(command)
+      const result = resolveObjectTarget(
+        {
+          ...command.targetQuery,
+          rawText: command.targetQuery.rawText || userText,
+        },
+        context,
+        {
+          allowContextFallback: false,
+          action,
+        }
+      )
+
+      if (result.status === 'ambiguous' && result.candidates?.length) {
+        const candidates = result.candidates.map((candidate) => candidate.objectId).filter(Boolean)
+        pendingDisambiguationRef.current = {
+          commands: [
+            ...preparedCommands,
+            {
+              ...command,
+              target: PENDING_TARGET,
+              targetQuery: undefined,
+            },
+            ...commands.slice(index + 1),
+          ],
+          candidates,
+          userText,
+          interpretation,
+          createdAt: Date.now(),
+        }
+        setDisambiguationCandidates(candidates)
+        setErrorMessage('')
+        setExecutionMessage(buildDisambiguationPrompt(candidates))
+        return { status: 'pending' }
+      }
+
+      if (result.status !== 'resolved' || !result.objectId) {
+        return {
+          status: 'error',
+          message: '没有找到 AI 命令要修改的对象，请换一种更明确的说法。',
+        }
+      }
+
+      preparedCommands.push({
+        ...command,
+        target: result.objectId,
+        targetQuery: undefined,
+      })
+    }
+
+    return { status: 'ready', commands: preparedCommands }
+  }
+
+  const getResolveActionForCommand = (command: DrawCommand): ResolveAction => {
+    if (command.action === 'delete') return 'delete'
+    if (command.action === 'move' || command.action === 'moveBy') return 'move'
+    if (command.action === 'scale') return 'scale'
+    if (command.action === 'select') return 'select'
+    if (command.action === 'modify') {
+      if (command.params && ('fill' in command.params || 'stroke' in command.params)) {
+        return 'recolor'
+      }
+      return 'edit'
+    }
+    return 'edit'
+  }
+
   const handleDisambiguationReply = (text: string) => {
     const pending = pendingDisambiguationRef.current
     if (!pending) return false
@@ -554,12 +661,27 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     }
 
     const resolvedCommands = replacePendingTarget(pending.commands, targetId)
+    const prepared = prepareCommandsWithTargetQueries(
+      resolvedCommands,
+      buildCanvasContext(),
+      `${pending.userText}；确认：${text}`,
+      pending.interpretation
+    )
+    if (prepared.status === 'pending') return true
+    if (prepared.status === 'error') {
+      clearPendingDisambiguation()
+      setStatus('error')
+      setErrorMessage(prepared.message)
+      setExecutionMessage('')
+      return true
+    }
+
     clearPendingDisambiguation()
     setLastCommandSource('fast')
     setInterpretedText(`${pending.interpretation}：已确认目标`)
     setStatus('drawing')
 
-    const result = executeCommands(resolvedCommands)
+    const result = executeCommands(prepared.commands)
     if (!result.success) {
       setStatus('error')
       setErrorMessage(result.message)
@@ -567,11 +689,11 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       return true
     }
 
-    recordCommands(resolvedCommands)
+    recordCommands(prepared.commands)
     appendLocalChat(
       `${pending.userText}；确认：${text}`,
       result.message || '已完成',
-      resolvedCommands
+      prepared.commands
     )
     setStatus('done')
     setExecutionMessage(result.message || '已完成')

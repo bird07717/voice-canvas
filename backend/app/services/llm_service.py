@@ -175,13 +175,13 @@ arguments:
 2. edit_object: 修改对象
 arguments:
 {
-  "target": {"ref": "last|selected|kind|id", "kind": "对象类型", "id": "对象id"},
+  "target": {"ref": "last|selected|kind|id", "kind": "对象类型", "label": "对象中文名", "spatial": "left|right|top|bottom|center|largest"},
   "operation": "move|resize|recolor|rotate|restyle",
   "changes": {"fill": "颜色", "x": 数字, "y": 数字, "dx": 数字, "dy": 数字, "scale": 数字, "scale_delta": 数字, "rotation": 数字}
 }
 
 3. delete_object: 删除对象
-arguments: {"target": {"ref": "last|selected|kind|id", "kind": "对象类型", "id": "对象id"}}
+arguments: {"target": {"ref": "last|selected|kind|id", "kind": "对象类型", "label": "对象中文名", "spatial": "left|right|top|bottom|center|largest"}}
 
 4. control_canvas: 画布控制
 arguments: {"action": "undo|redo|clear|save|export"}
@@ -199,6 +199,8 @@ arguments: {"reason": "忽略原因"}
 - 只要用户有明确绘画对象、颜色、位置或编辑动作，就尽量调用工具，不要轻易 ignore。
 - 只有完全无关的话才 ignore。
 - “它”“刚才那个”“这个”默认 target.ref = "last"。
+- 不要猜对象 id；除非用户明确指向当前/刚才/选中对象，否则优先用 target.ref="kind" 并填写 kind、label、spatial，让系统的语义 Resolver 绑定真实对象。
+- “左边的树”“右边那个云”“最大的气球”应使用 target.spatial 表达位置或大小。
 - “往左/右/上/下移动一点”使用 edit_object，operation="move"，changes 使用 dx/dy，例如左移一点 dx=-40。
 - “变大/放大/小一点”使用 edit_object，operation="resize"，changes 使用 scale_delta，例如变大一点 scale_delta=1.2。
 - “清空”“撤销”“重做”使用 control_canvas。

@@ -251,26 +251,77 @@ class DrawingExecutor:
         }
 
     def _edit_object(self, args: EditObjectArgs) -> Optional[Dict[str, Any]]:
-        target = self._resolve_target(args.target)
-        if not target:
+        target, target_query = self._target_command_fields(args.target)
+        if not target and not target_query:
             return None
 
-        target_object = self._find_object_by_id(target)
+        if target_query:
+            command = self._target_query_edit_command(args)
+            if not command:
+                return None
+            command["targetQuery"] = target_query
+            return command
+
+        target_object = self._find_object_by_id(target) if target else None
         params = self._normalize_changes(args.changes, target_object)
         if not params:
             return None
 
-        return {
+        command = {
             "action": "modify",
-            "target": target,
             "params": params
         }
+        if target:
+            command["target"] = target
+        if target_query:
+            command["targetQuery"] = target_query
+        return command
+
+    def _target_query_edit_command(self, args: EditObjectArgs) -> Optional[Dict[str, Any]]:
+        changes = args.changes or {}
+
+        if "dx" in changes or "dy" in changes:
+            return {
+                "action": "moveBy",
+                "params": {
+                    "dx": float(changes.get("dx") or 0),
+                    "dy": float(changes.get("dy") or 0),
+                },
+            }
+
+        if "x" in changes or "y" in changes:
+            return {
+                "action": "move",
+                "params": {
+                    key: value
+                    for key, value in {
+                        "x": changes.get("x"),
+                        "y": changes.get("y"),
+                    }.items()
+                    if value is not None
+                },
+            }
+
+        scale = changes.get("scale_delta") or changes.get("scale")
+        if scale:
+            return {
+                "action": "scale",
+                "params": {"scale": float(scale)},
+            }
+
+        params = self._normalize_changes(changes, None)
+        return {"action": "modify", "params": params} if params else None
 
     def _delete_object(self, args: DeleteObjectArgs) -> Optional[Dict[str, Any]]:
-        target = self._resolve_target(args.target)
-        if not target:
+        target, target_query = self._target_command_fields(args.target)
+        if not target and not target_query:
             return None
-        return {"action": "delete", "target": target}
+        command = {"action": "delete"}
+        if target:
+            command["target"] = target
+        if target_query:
+            command["targetQuery"] = target_query
+        return command
 
     def _control_canvas(self, args: ControlCanvasArgs) -> Optional[Dict[str, Any]]:
         if args.action in {"undo", "redo", "clear"}:
@@ -294,6 +345,33 @@ class DrawingExecutor:
         if target.ref in {"last", "selected"}:
             return "__last__"
         return None
+
+    def _target_command_fields(self, target: TargetSpec) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        if target.ref == "kind" and target.kind:
+            return None, self._target_query(target)
+        if target.ref == "id" and not target.id:
+            return None, self._target_query(target)
+        if target.spatial or target.label or target.category or target.role or target.raw_text:
+            return None, self._target_query(target)
+        return self._resolve_target(target), None
+
+    def _target_query(self, target: TargetSpec) -> Dict[str, Any]:
+        query: Dict[str, Any] = {}
+        if target.raw_text:
+            query["rawText"] = target.raw_text
+        if target.kind:
+            query["kind"] = self._normalize_template_kind(target.kind.lower())
+        if target.label:
+            query["label"] = target.label
+        if target.category:
+            query["category"] = target.category
+        if target.role:
+            query["role"] = target.role
+        if target.spatial:
+            query["spatial"] = target.spatial
+        if not query and target.id:
+            query["target"] = target.id
+        return query
 
     def _last_object_id(self) -> Optional[str]:
         objects = self.canvas_context.get("objects") or []
