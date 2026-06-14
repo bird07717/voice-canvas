@@ -244,9 +244,7 @@ class ScenePatchExecutor:
     def _default_strategy(self, kind: str) -> str:
         if kind in BASIC_KINDS:
             return "basic"
-        if kind in TEMPLATE_KINDS:
-            return "template"
-        return "basic"
+        return "svg"
 
     def _position_xy(self, operation: ScenePatchOperation) -> tuple[float, float]:
         if operation.position.anchor == "custom" and operation.position.x is not None and operation.position.y is not None:

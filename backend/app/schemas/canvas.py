@@ -49,6 +49,9 @@ class VoiceCommandResponse(BaseModel):
     commands: List[dict]
     response: str
     reason: Optional[str] = None
+    llm_route: Optional[str] = None
+    llm_used: bool = False
+    routing_reason: Optional[str] = None
     scene: Optional[dict] = None
     needs_disambiguation: bool = False
     disambiguation: Optional[dict] = None

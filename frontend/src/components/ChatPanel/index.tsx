@@ -62,6 +62,23 @@ export default function ChatPanel() {
   const getSceneTitle = (commandJson: any) =>
     commandJson?.scene?.title || commandJson?.scene?.scene_title || ''
 
+  const getRouteLabel = (commandJson: any) => {
+    switch (commandJson?.llm_route) {
+      case 'template_scene':
+        return '固定模板'
+      case 'template_scene_patch':
+        return commandJson?.llm_used ? '模板 + LLM补丁' : '模板，补丁未启用'
+      case 'open_scene':
+        return 'LLM开放场景'
+      case 'tool_plan':
+        return 'LLM工具规划'
+      case 'requires_llm':
+        return '需要LLM'
+      default:
+        return ''
+    }
+  }
+
   const getSceneDebugSummary = (commandJson: any) => {
     if (!import.meta.env.DEV || !commandJson?.scene) return null
 
@@ -69,6 +86,9 @@ export default function ChatPanel() {
       scene: commandJson.scene,
       command_count: getCommandCount(commandJson),
       reason: commandJson.reason,
+      llm_route: commandJson.llm_route,
+      llm_used: commandJson.llm_used,
+      routing_reason: commandJson.routing_reason,
     }
   }
 
@@ -107,6 +127,11 @@ export default function ChatPanel() {
                     {getSceneTitle(msg.command_json) && (
                       <div className="chat-command">
                         场景：{getSceneTitle(msg.command_json)}
+                      </div>
+                    )}
+                    {getRouteLabel(msg.command_json) && (
+                      <div className="chat-command">
+                        路由：{getRouteLabel(msg.command_json)}
                       </div>
                     )}
                     {getSceneDebugSummary(msg.command_json) && (

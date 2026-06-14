@@ -13,7 +13,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { PENDING_TARGET, isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
+import { PENDING_TARGET, isTemplateSceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
 import { ResolveAction, resolveObjectTarget } from '@/services/objectResolver'
 import {
   buildMoveByUpdates,
@@ -50,6 +50,23 @@ type PreparedCommandsResult =
   | { status: 'ready'; commands: DrawCommand[] }
   | { status: 'pending' }
   | { status: 'error'; message: string }
+
+const getLLMRouteLabel = (route?: string, llmUsed?: boolean) => {
+  switch (route) {
+    case 'template_scene':
+      return '固定模板'
+    case 'template_scene_patch':
+      return llmUsed ? '模板 + LLM补丁' : '固定模板，补丁未启用'
+    case 'open_scene':
+      return 'LLM开放场景'
+    case 'tool_plan':
+      return 'LLM工具规划'
+    case 'requires_llm':
+      return '需要LLM'
+    default:
+      return ''
+  }
+}
 
 const SCENE_SHORTCUTS = [
   { title: '海边日落', tone: '暖阳海面' },
@@ -361,7 +378,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       }
     }
 
-    const canUseTemplateScene = isLikelySceneRequest(text)
+    const canUseTemplateScene = isTemplateSceneRequest(text)
     if (!activeConfig && !canUseTemplateScene) {
       setStatus('error')
       setLastCommandSource(null)
@@ -373,8 +390,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
     setStatus('thinking')
     setLastCommandSource('llm')
-    setInterpretedText('复杂绘图或编辑命令，交给 AI 继续理解。')
-    setExecutionMessage('AI 正在规划完整场景...')
+    setInterpretedText(activeConfig ? '第三层 LLM 增强正在理解。' : '固定场景模板，后端快速生成。')
+    setExecutionMessage(activeConfig ? 'AI 正在选择场景、补丁或工具规划...' : '正在生成模板场景...')
     setIsProcessing(true)
 
     try {
@@ -394,6 +411,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         setExecutionMessage('已忽略无效语音')
         return
       }
+
+      const routeLabel = getLLMRouteLabel(response.llm_route, response.llm_used)
 
       if (response.chat_history.length > 0) {
         setChatHistory(response.chat_history)
@@ -476,12 +495,16 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         recordCommands(prepared.commands)
       }
       if (response.response) {
-        setInterpretedText(response.scene ? `理解为：${response.scene.title}场景` : response.response)
+        setInterpretedText(
+          response.scene
+            ? `理解为：${response.scene.title}场景${routeLabel ? `（${routeLabel}）` : ''}`
+            : response.response
+        )
       }
       setStatus('done')
       setExecutionMessage(
         response.scene
-          ? `执行状态：已生成 ${response.scene.object_count || response.commands.length} 个对象`
+          ? `执行状态：${routeLabel || '场景生成'}，已生成 ${response.scene.object_count || response.commands.length} 个对象`
           : response.response || '已完成'
       )
     } catch (error: any) {

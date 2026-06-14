@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.models.llm_config import LLMConfig
 from app.scene.schemas import ScenePlan
-from app.scene.templates import apply_scene_template
+from app.assets.resolver import AssetResolver
 
 
 class ScenePlanningError(Exception):
@@ -17,17 +17,17 @@ class ScenePlanningError(Exception):
 
 
 class ScenePlanner:
-    SYSTEM_PROMPT = """你是语音绘画系统的场景规划器。
-你的任务是把用户的一句话绘画需求拆成语义化场景计划。
-不要输出底层 Konva 参数。
+    SYSTEM_PROMPT = """你是语音绘画系统的第三层开放场景规划器。
+前两层已经处理了快速几何命令和固定场景模板。你只负责更开放、更有组合性的场景描述。
+你的任务是把用户的一句话绘画需求拆成语义化场景计划，不要输出底层 Konva 参数。
 只输出严格 JSON，不要 Markdown，不要代码块。
 画布大小为 800x600。
-对象数量控制在 5-12 个。
+对象数量控制在 6-14 个。
 对象要有合理布局和层级。
 
 输出 JSON 必须符合这个结构：
 {
-  "scene_type": "英文场景类型，如 beach_sunset/park/birthday_card/city_night",
+  "scene_type": "英文场景类型，如 rainy_cafe/cyberpunk_workspace/pet_party",
   "title": "中文场景标题",
   "style": "cartoon_flat",
   "background": {
@@ -38,7 +38,8 @@ class ScenePlanner:
   "objects": [
     {
       "id_hint": "可选的语义id",
-      "kind": "sun/tree/cloud/house/flower/person/car/mountain/grass/road/river/circle/rect/line/text/star 等",
+      "kind": "对象语义。优先使用 SVG 素材目录里的 kind；基础图形可用 circle/rect/line/text/star/polygon",
+      "render_strategy": "basic|template|svg",
       "role": "background|midground|foreground|decoration|label",
       "position": {
         "anchor": "center|top|bottom|left|right|top_left|top_right|bottom_left|bottom_right|custom",
@@ -67,13 +68,17 @@ class ScenePlanner:
 
 规则：
 - 必须返回单个 JSON object。
-- 不要创建少于 5 个对象，除非用户明确要求极简。
-- 不要创建超过 12 个对象。
+- 不要创建少于 6 个对象，除非用户明确要求极简。
+- 不要创建超过 14 个对象。
 - 只输出语义化对象，不要输出 Konva shape 参数或 children。
 - 默认 style 使用 cartoon_flat。
+- 优先使用 SVG 素材，render_strategy 设为 "svg"，kind 使用素材目录中的英文 kind。
+- 大块背景、地面、墙面、水面、文字和简单装饰用 basic，避免把背景错误匹配成图标。
+- 对于素材目录没有的具体物体，也可以输出 render_strategy="svg" 并在 description 里描述外观，系统会自动回退。
 - position.anchor 优先使用语义锚点，只有精确布局需要 custom x/y。
 - background 和远景对象 layer 较小，前景对象 layer 较大。
 - 如果用户要求贺卡或海报，文字对象 kind 使用 text，style.text 填入文字。
+- 不要直接复述固定模板；要体现用户的开放描述和差异化对象。
 """
 
     EXAMPLE = {
@@ -147,16 +152,20 @@ class ScenePlanner:
         text: str,
         canvas_context: Optional[Dict[str, Any]],
         llm_config: LLMConfig,
+        asset_resolver: Optional[AssetResolver] = None,
     ) -> ScenePlan:
+        resolver = asset_resolver or AssetResolver()
         client = AsyncOpenAI(
             api_key=llm_config.api_key,
             base_url=llm_config.base_url,
         )
+        svg_catalog = resolver.catalog_summary()
 
         response = await client.chat.completions.create(
             model=llm_config.model_name,
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
+                {"role": "system", "content": f"可用 SVG 素材目录：\n{svg_catalog}"},
                 {
                     "role": "system",
                     "content": f"参考输出示例：{json.dumps(self.EXAMPLE, ensure_ascii=False)}",
@@ -164,8 +173,8 @@ class ScenePlanner:
                 {"role": "system", "content": self._format_canvas_context(canvas_context)},
                 {"role": "user", "content": text},
             ],
-            temperature=0.4,
-            max_tokens=2500,
+            temperature=0.45,
+            max_tokens=3200,
         )
 
         content = response.choices[0].message.content or ""
@@ -189,4 +198,4 @@ class ScenePlanner:
                 "ScenePlan objects 为空",
             )
 
-        return apply_scene_template(plan)
+        return plan
