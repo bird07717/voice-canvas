@@ -1,5 +1,5 @@
 import { CanvasCommandContext, DrawCommand } from '@/types'
-import { ResolveResult, hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
+import { ResolveAction, ResolveResult, hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
 
 export const PENDING_TARGET = '__pending_target__'
 
@@ -110,13 +110,13 @@ const hasExplicitColor = (text: string) =>
 const getShapeColor = (text: string) =>
   parseColor(text, '#60a5fa')
 
-const resolveSemanticTarget = (text: string, context: CanvasCommandContext) => {
+const resolveSemanticTarget = (text: string, context: CanvasCommandContext, action?: ResolveAction) => {
   if (!hasSemanticTargetHint(text, context)) return null
-  return resolveObjectTarget({ rawText: text }, context, { allowContextFallback: false })
+  return resolveObjectTarget({ rawText: text }, context, { allowContextFallback: false, action })
 }
 
-const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>
-  resolveObjectTarget({ rawText: text }, context)
+const resolveSpokenTarget = (text: string, context: CanvasCommandContext, action?: ResolveAction) =>
+  resolveObjectTarget({ rawText: text }, context, { action })
 
 const getTargetErrorMessage = (result: ResolveResult) => {
   if (result.status === 'ambiguous') {
@@ -236,14 +236,14 @@ export function matchFastCommand(
   }
 
   if (/^(删除|删掉|去掉|移除)(它|这个|选中|当前)?$/.test(text) || (/^(删除|删掉|去掉|移除).+/.test(text) && hasSemanticTargetHint(text, context))) {
-    const targetResult = resolveSpokenTarget(text, context)
+    const targetResult = resolveSpokenTarget(text, context, 'delete')
     return commandOrDisambiguationResult('删除对象', targetResult, (target) => [
       { action: 'delete', target },
     ])
   }
 
   if (/^(选中|选择|选一下|点一下|点选).+/.test(text)) {
-    const semanticResult = resolveSemanticTarget(text, context)
+    const semanticResult = resolveSemanticTarget(text, context, 'select')
     const targetResult = semanticResult || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context) : null)
     if (!targetResult) {
       return {
@@ -258,9 +258,8 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  const targetResult = resolveSpokenTarget(text, context)
-
   if (/(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
+    const targetResult = resolveSpokenTarget(text, context, 'recolor')
     const color = parseColor(text)
     return commandOrDisambiguationResult(`把对象变成${color.label || '指定颜色'}`, targetResult, (target) => [
       {
@@ -275,12 +274,14 @@ export function matchFastCommand(
   }
 
   if (/(变大|放大|弄大|大一点|大一些|再大一点)/.test(text)) {
+    const targetResult = resolveSpokenTarget(text, context, 'scale')
     return commandOrDisambiguationResult('放大对象', targetResult, (target) => [
       { action: 'scale', target, params: { scale: 1.2 } },
     ] as DrawCommand[])
   }
 
   if (/(变小|缩小|弄小|小一点|小一些|再小一点)/.test(text)) {
+    const targetResult = resolveSpokenTarget(text, context, 'scale')
     return commandOrDisambiguationResult('缩小对象', targetResult, (target) => [
       { action: 'scale', target, params: { scale: 0.8 } },
     ] as DrawCommand[])
@@ -294,6 +295,7 @@ export function matchFastCommand(
   ]
   const moveMatch = moveMap.find(([pattern]) => pattern.test(text))
   if (moveMatch) {
+    const targetResult = resolveSpokenTarget(text, context, 'move')
     return commandOrDisambiguationResult(moveMatch[1], targetResult, (target) => [
       { action: 'moveBy', target, params: { dx: moveMatch[2], dy: moveMatch[3] } },
     ] as DrawCommand[])
@@ -309,6 +311,7 @@ export function matchFastCommand(
   ]
   const cornerMatch = cornerMap.find(([pattern]) => pattern.test(text))
   if (cornerMatch) {
+    const targetResult = resolveSpokenTarget(text, context, 'move')
     return commandOrDisambiguationResult(cornerMatch[1], targetResult, (target) => [
       { action: 'move', target, params: { x: cornerMatch[2], y: cornerMatch[3] } },
     ] as DrawCommand[])
@@ -322,6 +325,7 @@ export function matchFastCommand(
   ]
   const sideMatch = sideMap.find(([pattern]) => pattern.test(text))
   if (sideMatch) {
+    const targetResult = resolveSpokenTarget(text, context, 'move')
     return commandOrDisambiguationResult(sideMatch[1], targetResult, (target) => [
       { action: 'move', target, params: { x: sideMatch[2], y: sideMatch[3] } },
     ] as DrawCommand[])

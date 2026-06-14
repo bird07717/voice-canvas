@@ -17,6 +17,8 @@ export type TargetQuery = {
   spatial?: SpatialSlot | 'largest'
 }
 
+export type ResolveAction = 'select' | 'move' | 'scale' | 'recolor' | 'delete' | 'edit'
+
 export type ResolveStatus = 'resolved' | 'ambiguous' | 'not_found'
 
 export type ResolveResult = {
@@ -31,6 +33,7 @@ type ResolveOptions = {
   allowContextFallback?: boolean
   minScore?: number
   minGap?: number
+  action?: ResolveAction
 }
 
 const DEFAULT_MIN_SCORE = 36
@@ -42,6 +45,37 @@ const hasContextReference = (text: string) =>
 
 const hasTargetActionPrefix = (text: string) =>
   /^(选中|选择|选一下|点一下|点选|删除|删掉|去掉|移除)/.test(text)
+
+const explicitlyTargetsEnvironment = (text: string) =>
+  /背景|天空|地面|草地|沙滩|海面|道路|路|环境/.test(text)
+
+const isEnvironmentProfile = (profile: ObjectSemanticProfile) =>
+  profile.category === 'background'
+  || profile.category === 'environment'
+  || profile.role === 'background'
+  || profile.kind === 'background'
+  || profile.kind === 'ground'
+
+const canProfileHandleAction = (
+  profile: ObjectSemanticProfile,
+  action: ResolveAction | undefined,
+  text: string
+) => {
+  if (!action || action === 'select') return true
+
+  const environmentRequested = explicitlyTargetsEnvironment(text)
+  if (!environmentRequested && isEnvironmentProfile(profile)) return false
+
+  if (action === 'move') {
+    return profile.capabilities.move && profile.area < 800 * 600 * 0.65
+  }
+  if (action === 'scale') return profile.capabilities.scale
+  if (action === 'recolor') return profile.capabilities.recolor
+  if (action === 'delete') return profile.capabilities.delete
+  if (action === 'edit') return true
+
+  return true
+}
 
 export const detectSpatialHint = (text: string): TargetQuery['spatial'] => {
   const normalized = normalizeQueryText(text)
@@ -167,6 +201,7 @@ export const resolveObjectTarget = (
   const minScore = options.minScore ?? (spatial ? SPATIAL_ONLY_MIN_SCORE : DEFAULT_MIN_SCORE)
   const minGap = options.minGap ?? DEFAULT_MIN_GAP
   const ranked = profiles
+    .filter((profile) => canProfileHandleAction(profile, options.action, normalizedText))
     .map((profile) => scoreProfile(profile, query, context, maxArea))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score)
