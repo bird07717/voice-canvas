@@ -52,9 +52,7 @@ const normalizeSceneRequestText = (rawText: string) =>
   rawText
     .trim()
     .replace(/[，。！？、,.!?:：\s]/g, '')
-    .replace(/^请/, '')
-    .replace(/^帮我/, '')
-    .replace(/^给我/, '')
+    .replace(/^(麻烦你|麻烦|请你|请帮我|帮我|给我|我想要|我想|想要|请)/, '')
 
 const hasSceneRequestPrefix = (text: string) =>
   /^(画|画一个|画个|生成|创建|来一个|来个|做一个|做个)/.test(text)

@@ -105,8 +105,27 @@ def _normalize_text(text: str) -> str:
     return "".join(str(text or "").split())
 
 
-def has_scene_draw_prefix(text: str) -> bool:
+def _strip_request_prefix(text: str) -> str:
     normalized = _normalize_text(text)
+    for prefix in (
+        "麻烦你",
+        "麻烦",
+        "请你",
+        "请帮我",
+        "帮我",
+        "给我",
+        "我想要",
+        "我想",
+        "想要",
+        "请",
+    ):
+        if normalized.startswith(prefix):
+            return normalized[len(prefix):]
+    return normalized
+
+
+def has_scene_draw_prefix(text: str) -> bool:
+    normalized = _strip_request_prefix(text)
     return normalized.startswith((
         "画",
         "生成",
@@ -119,7 +138,7 @@ def has_scene_draw_prefix(text: str) -> bool:
 
 
 def is_open_scene_request(text: str) -> bool:
-    normalized = _normalize_text(text)
+    normalized = _strip_request_prefix(text)
     if not normalized:
         return False
 
