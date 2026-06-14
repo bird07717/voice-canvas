@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Body -->
+  <ellipse cx="55" cy="60" rx="18" ry="12" fill="#FF9688" transform="rotate(-10 55 60)"/>
+  <!-- Tail fin -->
+  <path d="M68 52 L78 48 L75 55 L68 58 Z" fill="#FF6B9D" opacity="0.8"/>
+  <!-- Top fin -->
+  <path d="M45 50 L48 40 L55 43 L52 53 Z" fill="#FFB5A7" opacity="0.7"/>
+  <!-- Bottom fin -->
+  <path d="M45 67 L48 77 L54 73 L52 65 Z" fill="#FFB5A7" opacity="0.7"/>
+  <!-- Head -->
+  <circle cx="35" cy="58" r="6" fill="#FF6B9D"/>
+  <!-- Eye -->
+  <circle cx="33" cy="57" r="2" fill="#333"/>
+  <circle cx="33.5" cy="56.5" r="0.8" fill="white"/>
+  <!-- Mouth -->
+  <path d="M30 60 Q28 61 29 62" fill="none" stroke="#333" stroke-width="1"/>
+  <!-- Scales pattern -->
+  <path d="M42 57 Q45 55 48 57" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <path d="M48 57 Q51 55 54 57" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <path d="M54 57 Q57 55 60 57" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <path d="M42 63 Q45 61 48 63" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <path d="M48 63 Q51 61 54 63" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <path d="M54 63 Q57 61 60 63" fill="none" stroke="#FFD93D" stroke-width="1" opacity="0.5"/>
+  <!-- Bubbles -->
+  <circle cx="25" cy="53" r="2" fill="#6BCDFF" opacity="0.4"/>
+  <circle cx="22" cy="57" r="1.5" fill="#6BCDFF" opacity="0.3"/>
+  <circle cx="20" cy="61" r="1" fill="#6BCDFF" opacity="0.3"/>
+</svg>

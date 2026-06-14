@@ -157,16 +157,20 @@ class DrawingExecutor:
         kind = args.kind.lower()
         render_strategy = args.render_strategy
 
+        # 优先级1: 显式指定为basic时，使用基础形状
         if render_strategy == "basic" or kind in BASIC_SHAPES:
             return [self._create_basic_shape(kind, args)]
 
-        if render_strategy == "template" or kind in TEMPLATE_KINDS:
-            return [self._create_template(kind, args)]
-
+        # 优先级2: 尝试使用SVG资源（优先于template）
         asset = self.asset_resolver.resolve(kind, args.description)
         if asset:
             return [self._create_svg_asset(args, asset)]
 
+        # 优先级3: 回退到template（当SVG资源不存在时）
+        if render_strategy == "template" or kind in TEMPLATE_KINDS:
+            return [self._create_template(kind, args)]
+
+        # 优先级4: 创建占位符
         return [self._create_svg_placeholder(args)]
 
     def _create_basic_shape(self, kind: str, args: CreateObjectArgs) -> Dict[str, Any]:
@@ -454,7 +458,8 @@ class DrawingExecutor:
         if target.raw_text:
             query["rawText"] = target.raw_text
         if target.kind:
-            query["kind"] = str(target.kind).strip().lower()
+            # 使用normalize确保中文别名转换为英文kind
+            query["kind"] = self._normalize_template_kind(str(target.kind).strip().lower())
         if target.label:
             query["label"] = target.label
         if target.category:
@@ -584,36 +589,10 @@ class DrawingExecutor:
         return f"{self._id_prefix}_{next(self._id_counter)}"
 
     def _normalize_template_kind(self, kind: str) -> str:
-        aliases = {
-            "太阳": "sun",
-            "树": "tree",
-            "云": "cloud",
-            "房子": "house",
-            "花": "flower",
-            "人": "person",
-            "小人": "person",
-            "车": "car",
-            "山": "mountain",
-            "草": "grass",
-            "草地": "grass",
-            "路": "road",
-            "道路": "road",
-            "小路": "road",
-            "河": "river",
-            "河流": "river",
-            "海": "river",
-            "海面": "river",
-            "椰子树": "palm_tree",
-            "长椅": "bench",
-            "气球": "balloon",
-            "礼物": "gift",
-            "蛋糕": "cake",
-            "高楼": "building",
-            "帆船": "sailboat",
-            "栅栏": "fence",
-            "课桌": "desk",
-        }
-        return aliases.get(kind, kind)
+        """将中文别名标准化为英文kind，使用与target_resolver相同的别名系统"""
+        # 导入统一的别名字典
+        from app.drawing.target_resolver import KIND_ALIASES
+        return KIND_ALIASES.get(kind, kind)
 
     def _template_generic(self, x: float, y: float, width: float, height: float, style: Dict[str, Any]) -> List[Dict[str, Any]]:
         return [{

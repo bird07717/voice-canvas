@@ -12,6 +12,7 @@ from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
 from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.planner import ScenePlanner, ScenePlanningError
 from app.scene.templates import build_template_scene_plan
+from app.assets.resolver import AssetResolver
 
 
 class LLMService:
@@ -195,7 +196,9 @@ arguments: {"reason": "忽略原因"}
 策略：
 - 常见对象使用 template：sun/tree/cloud/house/flower/person/car/mountain/grass/road/river。
 - 基础图形使用 basic：circle/rectangle/square/line/text/star/polygon。
-- 模板库没有的对象使用 svg，例如恐龙、飞船、猫头鹰、小提琴。
+- **优先使用SVG资源库中的素材**，当前可用SVG素材涵盖动物、建筑、家具、装饰、电子设备、食物、节日等类别。
+- SVG素材库详情见下方资源目录，使用时 render_strategy 设为 "svg"，kind 使用英文名称。
+- 模板库和SVG都没有的对象才使用 svg render_strategy 并提供 description。
 - 只要用户有明确绘画对象、颜色、位置或编辑动作，就尽量调用工具，不要轻易 ignore。
 - 只有完全无关的话才 ignore。
 - “它”“刚才那个”“这个”默认 target.ref = "last"。
@@ -255,8 +258,9 @@ arguments: {"reason": "忽略原因"}
 }
 """
 
-    def __init__(self, db: Optional[AsyncSession]):
+    def __init__(self, db: Optional[AsyncSession] = None):
         self.db = db
+        self.asset_resolver = AssetResolver()
 
     def _extract_json(self, content: str) -> Dict[str, Any]:
         """Parse strict JSON, with a small fallback for models that add prose."""
@@ -347,6 +351,20 @@ arguments: {"reason": "忽略原因"}
             *(object_lines or ["- 无对象"]),
             f"recentCommands={recent_summary}"
         ])
+
+    def _get_svg_assets_catalog(self) -> str:
+        """生成SVG资源目录供LLM参考"""
+        try:
+            assets = self.asset_resolver.list_assets()
+            if not assets:
+                return ""
+            catalog = self.asset_resolver.catalog_summary()
+            if catalog:
+                return f"\n\nSVG素材库（{len(assets)}个素材，使用时 render_strategy='svg'）：\n{catalog}"
+            return ""
+        except Exception:
+            return ""
+
 
     def _execute_tool_plan(
         self,
@@ -622,19 +640,25 @@ arguments: {"reason": "忽略原因"}
         # 调用OpenAI API
         client = AsyncOpenAI(
             api_key=config.api_key,
-            base_url=config.base_url
+            base_url=config.base_url,
+            timeout=60.0  # 设置60秒超时
         )
 
         try:
+            # 构建系统消息，包含SVG资源目录
+            svg_catalog = self._get_svg_assets_catalog()
+            system_message = self.TOOL_PLANNING_PROMPT + svg_catalog
+
             response = await client.chat.completions.create(
                 model=config.model_name,
                 messages=[
-                    {"role": "system", "content": self.TOOL_PLANNING_PROMPT},
+                    {"role": "system", "content": system_message},
                     {"role": "system", "content": self._format_canvas_context(canvas_context)},
                     {"role": "user", "content": text}
                 ],
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=2000,
+                timeout=60.0  # 设置60秒超时
             )
 
             content = response.choices[0].message.content
@@ -668,7 +692,8 @@ arguments: {"reason": "忽略原因"}
         try:
             client = AsyncOpenAI(
                 api_key=api_key,
-                base_url=base_url
+                base_url=base_url,
+                timeout=30.0  # 测试连接使用30秒超时
             )
 
             response = await client.chat.completions.create(
@@ -677,7 +702,8 @@ arguments: {"reason": "忽略原因"}
                     {"role": "user", "content": "Reply with exactly: OK"}
                 ],
                 temperature=0,
-                max_tokens=50
+                max_tokens=50,
+                timeout=30.0  # 测试连接使用30秒超时
             )
 
             content = response.choices[0].message.content or ""

@@ -9,11 +9,12 @@ import re
 APP_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = APP_ROOT.parent
 PROJECT_ROOT = BACKEND_ROOT.parent
-BACKEND_SVG_ASSET_ROOT = APP_ROOT / "assets" / "svg"
 
+# SVG资源统一存放在前端public目录，便于管理
 DEFAULT_ASSET_ROOTS = [
-    BACKEND_SVG_ASSET_ROOT,
     PROJECT_ROOT / "frontend" / "public" / "svg-assets",
+    PROJECT_ROOT / "svg_assets",
+    Path("/svg-assets"),
 ]
 
 KIND_ALIASES: Dict[str, List[str]] = {
@@ -57,10 +58,13 @@ def _tokens(text: str) -> List[str]:
 
 
 def _public_url(root: Path, file_path: Path) -> str:
+    """生成SVG资源的public URL
+
+    所有SVG资源统一存放在前端public/svg-assets目录
+    URL格式: /svg-assets/{relative_path}
+    """
     relative = file_path.relative_to(root).as_posix()
-    if root.resolve().as_posix().endswith("/frontend/public/svg-assets"):
-        return f"/svg-assets/{relative}"
-    return f"/api/assets/svg/{relative}"
+    return f"/svg-assets/{relative}"
 
 
 def _load_manifest(root: Path) -> Dict[str, Dict[str, Any]]:
@@ -97,6 +101,7 @@ class AssetResolver:
 
     def list_assets(self) -> List[SVGAsset]:
         assets: List[SVGAsset] = []
+        seen_asset_ids = set()
         for root in self.roots:
             if not root.exists():
                 continue
@@ -105,6 +110,9 @@ class AssetResolver:
                 if not file_path.is_file():
                     continue
                 asset_id = file_path.relative_to(root).with_suffix("").as_posix()
+                if asset_id in seen_asset_ids:
+                    continue
+                seen_asset_ids.add(asset_id)
                 metadata = manifest.get(asset_id, {})
                 stem_tokens = _tokens(file_path.stem)
                 folder_tokens = _tokens(file_path.parent.relative_to(root).as_posix())
@@ -137,19 +145,20 @@ class AssetResolver:
                 )
         return assets
 
-    def catalog_summary(self, limit: int = 80) -> str:
+    def catalog_summary(self, limit: Optional[int] = None) -> str:
         assets = self.list_assets()
         if not assets:
             return "当前 SVG 素材库为空；新增未知物体时应回退到 template 或 basic 几何。"
 
         lines = []
-        for asset in assets[:limit]:
+        selected_assets = assets[:limit] if limit is not None else assets
+        for asset in selected_assets:
             aliases = ",".join(asset.aliases[:6])
             lines.append(
                 f"- {asset.asset_id}: kind={asset.kind}; label={asset.label}; "
                 f"category={asset.category}; aliases={aliases}; keywords={','.join(asset.keywords[:8])}"
             )
-        if len(assets) > limit:
+        if limit is not None and len(assets) > limit:
             lines.append(f"- 还有 {len(assets) - limit} 个素材未列出。")
         return "\n".join(lines)
 
