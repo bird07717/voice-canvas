@@ -1,10 +1,68 @@
 import { useRef, useEffect, useState } from 'react'
-import { Stage, Layer, Circle, Rect, Line, Text, Star, Group } from 'react-konva'
+import { Stage, Layer, Circle, Rect, Line, Text, Star, Group, Image as KonvaImage } from 'react-konva'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { CanvasObject } from '@/types'
 
 const CANVAS_WIDTH = 800
 const CANVAS_HEIGHT = 600
+
+function SvgCanvasImage({ src, commonProps }: { src: string; commonProps: any }) {
+  const [image, setImage] = useState<HTMLImageElement | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!src) {
+      setImage(null)
+      setFailed(true)
+      return
+    }
+
+    let active = true
+    const nextImage = new window.Image()
+    nextImage.onload = () => {
+      if (!active) return
+      setImage(nextImage)
+      setFailed(false)
+    }
+    nextImage.onerror = () => {
+      if (!active) return
+      setImage(null)
+      setFailed(true)
+    }
+    nextImage.src = src
+
+    return () => {
+      active = false
+    }
+  }, [src])
+
+  const {
+    src: _src,
+    assetId: _assetId,
+    kind: _kind,
+    kindLabel: _kindLabel,
+    sceneType: _sceneType,
+    sceneTitle: _sceneTitle,
+    sceneStyle: _sceneStyle,
+    sceneRole: _sceneRole,
+    idHint: _idHint,
+    ...imageProps
+  } = commonProps
+
+  if (failed || !image) {
+    return (
+      <Rect
+        {...imageProps}
+        fill="#f8fafc"
+        stroke="#94a3b8"
+        strokeWidth={1}
+        dash={[6, 4]}
+      />
+    )
+  }
+
+  return <KonvaImage {...imageProps} image={image} />
+}
 
 const translateChild = (child: CanvasObject, dx: number, dy: number): CanvasObject => {
   const params = { ...(child.params || {}) }
@@ -252,6 +310,14 @@ export default function CanvasBoard() {
             numPoints={obj.params.numPoints ?? 5}
             innerRadius={obj.params.innerRadius ?? 20}
             outerRadius={obj.params.outerRadius ?? 40}
+          />
+        )
+
+      case 'svg':
+        return (
+          <SvgCanvasImage
+            src={String(obj.params.src || '')}
+            commonProps={commonProps}
           />
         )
 

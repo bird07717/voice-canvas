@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.assets.registry import resolve_svg_asset
 from app.drawing.executor import DrawingExecutor
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
 from app.scene.schemas import SceneObject, ScenePlan
@@ -29,6 +30,12 @@ SUPPORTED_TEMPLATE_KINDS = {
     "sailboat",
     "fence",
     "desk",
+    "swing",
+    "kite",
+    "street_light",
+    "lamp",
+    "confetti",
+    "child",
 }
 
 BASIC_KINDS = {
@@ -169,6 +176,12 @@ class SceneExecutor:
 
     def _create_scene_object(self, scene_object: SceneObject, plan: ScenePlan) -> List[Dict[str, Any]]:
         kind = self._normalize_kind(scene_object.kind)
+        asset = resolve_svg_asset(kind, scene_object.label, plan.scene_type, plan.style)
+        if asset and kind not in BASIC_KINDS:
+            command = self._create_svg_asset_command(asset, scene_object, plan, kind)
+            self._attach_scene_metadata(command, scene_object, plan)
+            return [command]
+
         render_strategy = "basic" if kind in BASIC_KINDS else "template"
         if kind not in BASIC_KINDS and kind not in SUPPORTED_TEMPLATE_KINDS:
             kind = "text"
@@ -187,6 +200,37 @@ class SceneExecutor:
         for command in commands:
             self._attach_scene_metadata(command, scene_object, plan)
         return commands
+
+    def _create_svg_asset_command(
+        self,
+        asset: Dict[str, Any],
+        scene_object: SceneObject,
+        plan: ScenePlan,
+        kind: str,
+    ) -> Dict[str, Any]:
+        center_x, center_y = self._resolve_position(scene_object)
+        width, height = self._resolve_asset_size(scene_object, asset)
+        label = scene_object.label or asset.get("label") or self._kind_label(kind)
+
+        return {
+            "action": "create",
+            "type": "svg",
+            "id": self.drawing_executor._next_id(),
+            "params": {
+                "x": center_x - width / 2,
+                "y": center_y - height / 2,
+                "width": width,
+                "height": height,
+                "assetId": asset.get("id"),
+                "src": asset.get("path"),
+                "kind": kind,
+                "kindLabel": label,
+                "sceneType": plan.scene_type,
+                "sceneTitle": plan.title,
+                "sceneStyle": plan.style,
+                "sceneRole": scene_object.role,
+            },
+        }
 
     def _to_position_spec(self, scene_object: SceneObject) -> PositionSpec:
         x, y = self._resolve_position(scene_object)
@@ -239,6 +283,25 @@ class SceneExecutor:
         width, height = SIZE_PRESETS.get(scene_object.size.preset, SIZE_PRESETS["medium"])
         return scene_object.size.width or width, scene_object.size.height or height
 
+    def _resolve_asset_size(self, scene_object: SceneObject, asset: Dict[str, Any]) -> Tuple[float, float]:
+        if scene_object.size.width or scene_object.size.height:
+            return self._resolve_size(scene_object)
+
+        default_size = asset.get("defaultSize") or {}
+        width = float(default_size.get("width") or SIZE_PRESETS["medium"][0])
+        height = float(default_size.get("height") or SIZE_PRESETS["medium"][1])
+        scale = {
+            "tiny": 0.45,
+            "small": 0.75,
+            "medium": 1.0,
+            "large": 1.35,
+            "huge": 1.9,
+            "wide": 1.55,
+            "tall": 1.45,
+        }.get(scene_object.size.preset, 1.0)
+
+        return width * scale, height * scale
+
     def _attach_scene_metadata(
         self,
         command: Dict[str, Any],
@@ -287,6 +350,12 @@ class SceneExecutor:
             "帆船": "sailboat",
             "栅栏": "fence",
             "课桌": "desk",
+            "秋千": "swing",
+            "风筝": "kite",
+            "路灯": "street_light",
+            "灯": "lamp",
+            "彩带": "confetti",
+            "小孩": "child",
             "文字": "text",
             "星星": "star",
         }
@@ -314,6 +383,12 @@ class SceneExecutor:
             "sailboat": "帆船",
             "fence": "栅栏",
             "desk": "课桌",
+            "swing": "秋千",
+            "kite": "风筝",
+            "street_light": "路灯",
+            "lamp": "灯",
+            "confetti": "彩带",
+            "child": "小孩",
             "circle": "圆形",
             "rect": "矩形",
             "line": "线条",

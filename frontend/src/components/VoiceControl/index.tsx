@@ -354,6 +354,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       type: obj.type,
       kind: obj.params?.kind,
       kindLabel: obj.params?.kindLabel,
+      assetId: obj.params?.assetId,
+      src: obj.params?.src,
       text: obj.params?.text,
       x: obj.params?.x ?? bounds?.x,
       y: obj.params?.y ?? bounds?.y,

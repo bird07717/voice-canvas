@@ -1,0 +1,222 @@
+[
+  {
+    "id": "birthday.balloon",
+    "label": "气球",
+    "category": "birthday",
+    "path": "/assets/svg/birthday/balloon.svg",
+    "kinds": ["balloon"],
+    "tags": ["气球", "生日", "贺卡", "balloon"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 90, "height": 120 }
+  },
+  {
+    "id": "birthday.cake",
+    "label": "蛋糕",
+    "category": "birthday",
+    "path": "/assets/svg/birthday/cake.svg",
+    "kinds": ["cake"],
+    "tags": ["蛋糕", "生日蛋糕", "生日", "cake"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 150, "height": 130 }
+  },
+  {
+    "id": "birthday.confetti",
+    "label": "彩带",
+    "category": "birthday",
+    "path": "/assets/svg/birthday/confetti.svg",
+    "kinds": ["confetti"],
+    "tags": ["彩带", "彩纸", "装饰", "生日", "confetti"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 130, "height": 110 }
+  },
+  {
+    "id": "birthday.gift",
+    "label": "礼物",
+    "category": "birthday",
+    "path": "/assets/svg/birthday/gift.svg",
+    "kinds": ["gift"],
+    "tags": ["礼物", "礼盒", "生日", "gift"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 110, "height": 110 }
+  },
+  {
+    "id": "city.building",
+    "label": "高楼",
+    "category": "city",
+    "path": "/assets/svg/city/building.svg",
+    "kinds": ["building"],
+    "tags": ["高楼", "楼房", "城市", "building"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 130, "height": 230 }
+  },
+  {
+    "id": "city.car",
+    "label": "汽车",
+    "category": "city",
+    "path": "/assets/svg/city/car.svg",
+    "kinds": ["car"],
+    "tags": ["汽车", "车", "城市", "car"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 130, "height": 90 }
+  },
+  {
+    "id": "city.lamp",
+    "label": "灯",
+    "category": "city",
+    "path": "/assets/svg/city/lamp.svg",
+    "kinds": ["lamp", "street_light"],
+    "tags": ["灯", "路灯", "城市", "lamp"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 80, "height": 150 }
+  },
+  {
+    "id": "city.street_light",
+    "label": "路灯",
+    "category": "city",
+    "path": "/assets/svg/city/street_light.svg",
+    "kinds": ["street_light", "lamp"],
+    "tags": ["路灯", "灯", "城市", "street light"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 70, "height": 160 }
+  },
+  {
+    "id": "nature.cloud",
+    "label": "云",
+    "category": "nature",
+    "path": "/assets/svg/nature/cloud.svg",
+    "kinds": ["cloud"],
+    "tags": ["云", "天空", "cloud"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 130, "height": 90 }
+  },
+  {
+    "id": "nature.house",
+    "label": "房子",
+    "category": "nature",
+    "path": "/assets/svg/nature/house.svg",
+    "kinds": ["house"],
+    "tags": ["房子", "小屋", "house"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 160, "height": 140 }
+  },
+  {
+    "id": "nature.mountain",
+    "label": "山",
+    "category": "nature",
+    "path": "/assets/svg/nature/mountain.svg",
+    "kinds": ["mountain"],
+    "tags": ["山", "山峰", "山水", "mountain"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 210, "height": 150 }
+  },
+  {
+    "id": "nature.sun",
+    "label": "太阳",
+    "category": "nature",
+    "path": "/assets/svg/nature/sun.svg",
+    "kinds": ["sun"],
+    "tags": ["太阳", "日光", "天空", "sun"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 110, "height": 110 }
+  },
+  {
+    "id": "nature.tree",
+    "label": "树",
+    "category": "nature",
+    "path": "/assets/svg/nature/tree.svg",
+    "kinds": ["tree"],
+    "tags": ["树", "公园", "森林", "tree"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 120, "height": 160 }
+  },
+  {
+    "id": "nature.tree_oak",
+    "label": "橡树",
+    "category": "nature",
+    "path": "/assets/svg/nature/tree_oak.svg",
+    "kinds": ["tree", "oak"],
+    "tags": ["树", "橡树", "公园", "森林", "tree"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 130, "height": 170 }
+  },
+  {
+    "id": "nature.tree_pine",
+    "label": "松树",
+    "category": "nature",
+    "path": "/assets/svg/nature/tree_pine.svg",
+    "kinds": ["tree", "pine"],
+    "tags": ["树", "松树", "森林", "tree"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 120, "height": 180 }
+  },
+  {
+    "id": "park.bench",
+    "label": "长椅",
+    "category": "park",
+    "path": "/assets/svg/park/bench.svg",
+    "kinds": ["bench"],
+    "tags": ["长椅", "椅子", "公园", "bench"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 160, "height": 90 }
+  },
+  {
+    "id": "park.flower_patch",
+    "label": "花丛",
+    "category": "park",
+    "path": "/assets/svg/park/flower_patch.svg",
+    "kinds": ["flower", "flower_patch"],
+    "tags": ["花", "花丛", "公园", "flower"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 100, "height": 90 }
+  },
+  {
+    "id": "park.kite",
+    "label": "风筝",
+    "category": "park",
+    "path": "/assets/svg/park/kite.svg",
+    "kinds": ["kite"],
+    "tags": ["风筝", "公园", "天空", "kite"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 100, "height": 130 }
+  },
+  {
+    "id": "park.swing",
+    "label": "秋千",
+    "category": "park",
+    "path": "/assets/svg/park/swing.svg",
+    "kinds": ["swing"],
+    "tags": ["秋千", "公园", "游乐", "swing"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 140, "height": 140 }
+  },
+  {
+    "id": "people.child",
+    "label": "小孩",
+    "category": "people",
+    "path": "/assets/svg/people/child.svg",
+    "kinds": ["person", "child"],
+    "tags": ["小孩", "儿童", "人物", "child"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 85, "height": 130 }
+  },
+  {
+    "id": "people.person_sitting",
+    "label": "坐着的人",
+    "category": "people",
+    "path": "/assets/svg/people/person_sitting.svg",
+    "kinds": ["person", "sitting_person"],
+    "tags": ["人", "坐着", "人物", "person"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 100, "height": 120 }
+  },
+  {
+    "id": "people.teacher",
+    "label": "老师",
+    "category": "people",
+    "path": "/assets/svg/people/teacher.svg",
+    "kinds": ["person", "teacher"],
+    "tags": ["老师", "人物", "教室", "teacher"],
+    "style": "flat_cartoon",
+    "defaultSize": { "width": 95, "height": 140 }
+  }
+]

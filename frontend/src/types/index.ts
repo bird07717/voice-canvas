@@ -34,6 +34,8 @@ export interface CanvasObject {
     text?: string
     fontSize?: number
     points?: number[]
+    assetId?: string
+    src?: string
     [key: string]: any
   }
   children?: CanvasObject[]
@@ -64,6 +66,8 @@ export interface CanvasContextObject {
   type: string
   kind?: string
   kindLabel?: string
+  assetId?: string
+  src?: string
   text?: string
   x?: number
   y?: number
