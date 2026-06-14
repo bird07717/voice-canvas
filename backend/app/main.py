@@ -29,14 +29,7 @@ app.include_router(llm.router)
 svg_asset_dir = Path(__file__).resolve().parent / "assets" / "svg"
 svg_asset_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/api/assets/svg", StaticFiles(directory=svg_asset_dir), name="svg-assets")
-
-project_svg_asset_dir = Path(__file__).resolve().parents[2] / "svg_assets"
-if project_svg_asset_dir.exists():
-    app.mount(
-        "/api/assets/library",
-        StaticFiles(directory=project_svg_asset_dir),
-        name="svg-asset-library",
-    )
+app.mount("/api/assets/library", StaticFiles(directory=svg_asset_dir), name="svg-asset-library")
 
 
 @app.get("/")

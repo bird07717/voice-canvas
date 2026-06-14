@@ -6,13 +6,14 @@ import os
 import re
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-PROJECT_SVG_ASSET_ROOT = PROJECT_ROOT / "svg_assets"
+APP_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = APP_ROOT.parent
+PROJECT_ROOT = BACKEND_ROOT.parent
+BACKEND_SVG_ASSET_ROOT = APP_ROOT / "assets" / "svg"
 
 DEFAULT_ASSET_ROOTS = [
-    PROJECT_SVG_ASSET_ROOT,
+    BACKEND_SVG_ASSET_ROOT,
     PROJECT_ROOT / "frontend" / "public" / "svg-assets",
-    PROJECT_ROOT / "backend" / "app" / "assets" / "svg",
 ]
 
 KIND_ALIASES: Dict[str, List[str]] = {
@@ -57,9 +58,7 @@ def _tokens(text: str) -> List[str]:
 
 def _public_url(root: Path, file_path: Path) -> str:
     relative = file_path.relative_to(root).as_posix()
-    if root.resolve() == PROJECT_SVG_ASSET_ROOT.resolve():
-        return f"/api/assets/library/{relative}"
-    if "frontend/public/svg-assets" in root.as_posix():
+    if root.resolve().as_posix().endswith("/frontend/public/svg-assets"):
         return f"/svg-assets/{relative}"
     return f"/api/assets/svg/{relative}"
 
