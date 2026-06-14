@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <path d="M50 60 L60 50 L55 40 L45 40 L40 50 Z" fill="#FF9688"/>
+  <path d="M45 40 L50 35 L55 40 Z" fill="#FFB5A7"/>
+  <ellipse cx="50" cy="50" rx="8" ry="12" fill="#FF6B9D"/>
+  <circle cx="48" cy="48" r="2" fill="#333"/>
+  <circle cx="52" cy="48" r="2" fill="#333"/>
+  <line x1="50" y1="52" x2="48" y2="54" stroke="#333" stroke-width="1"/>
+  <line x1="50" y1="52" x2="52" y2="54" stroke="#333" stroke-width="1"/>
