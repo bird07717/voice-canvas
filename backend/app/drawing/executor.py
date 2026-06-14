@@ -454,7 +454,7 @@ class DrawingExecutor:
         if target.raw_text:
             query["rawText"] = target.raw_text
         if target.kind:
-            query["kind"] = self._normalize_template_kind(target.kind.lower())
+            query["kind"] = str(target.kind).strip().lower()
         if target.label:
             query["label"] = target.label
         if target.category:

@@ -60,6 +60,28 @@ const cases = [
   ['选中右边云朵', {}, 'resolved', 'cloud_mid'],
   ['选中中间云朵', {}, 'resolved', 'cloud_mid'],
   ['云朵', { objects: [baseContext.objects[0]], recentCommands: [] }, 'resolved', 'cloud_left'],
+  [
+    '选中书桌',
+    {
+      objects: [
+        {
+          id: 'desk_svg',
+          type: 'image',
+          kind: 'table_desk',
+          x: 200,
+          y: 220,
+          width: 160,
+          height: 90,
+          centerX: 280,
+          centerY: 265,
+          area: 14400,
+        },
+      ],
+      recentCommands: [],
+    },
+    'resolved',
+    'desk_svg',
+  ],
 ]
 
 for (const [text, contextPatch, status, objectId] of cases) {
