@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from openai import AsyncOpenAI
 from pydantic import ValidationError
@@ -26,7 +26,7 @@ class ScenePlanner:
 你的任务是把用户的一句话绘画需求拆成语义化场景计划，不要输出底层 Konva 参数。
 只输出严格 JSON，不要 Markdown，不要代码块。
 画布大小为 800x600。
-对象数量控制在 6-14 个。
+对象数量控制在 5-10 个。
 对象要有合理布局和层级。
 
 输出 JSON 必须符合这个结构：
@@ -72,8 +72,8 @@ class ScenePlanner:
 
 规则：
 - 必须返回单个 JSON object。
-- 不要创建少于 6 个对象，除非用户明确要求极简。
-- 不要创建超过 14 个对象。
+- 不要创建少于 5 个对象，除非用户明确要求极简。
+- 不要创建超过 10 个对象。
 - 只输出语义化对象，不要输出 Konva shape 参数或 children。
 - 默认 style 使用 cartoon_flat。
 - 优先使用 SVG 素材，render_strategy 设为 "svg"，kind 使用素材目录中的英文 kind。
@@ -172,6 +172,7 @@ class ScenePlanner:
         coerced.setdefault("scene_type", self._scene_type_from_text(text))
         coerced.setdefault("title", self._title_from_text(text))
         coerced.setdefault("style", "cartoon_flat")
+        coerced.setdefault("source", "llm_open_scene")
         coerced.setdefault("response", f"好的，我规划了{coerced['title']}场景。")
         return coerced
 
@@ -221,15 +222,61 @@ class ScenePlanner:
             return "cyberpunk_room"
         if "书房" in raw:
             return "study_room"
+        if "图书馆" in raw:
+            return "library"
         if "办公室" in raw:
             return "office"
         if "咖啡馆" in raw:
             return "cafe"
+        if "书店" in raw:
+            return "bookstore"
         return "open_scene"
 
     def _title_from_text(self, text: str) -> str:
         normalized = "".join(str(text or "").split())
-        for prefix in ("请帮我画一个", "请帮我画一幅", "帮我画一个", "帮我画一幅", "画一个", "画一幅", "画个", "生成一个", "创建一个", "来一个", "来个", "做一个", "做个", "画"):
+        for prefix in (
+            "请帮我画一个",
+            "请帮我画一幅",
+            "请帮我设计一个",
+            "请帮我设计一幅",
+            "请帮我生成一个",
+            "请帮我创建一个",
+            "请帮我制作一个",
+            "请帮我做一个",
+            "帮我画一个",
+            "帮我画一幅",
+            "帮我设计一个",
+            "帮我设计一幅",
+            "帮我生成一个",
+            "帮我创建一个",
+            "帮我制作一个",
+            "帮我做一个",
+            "请设计一个",
+            "请设计一幅",
+            "请生成一个",
+            "请生成一幅",
+            "请创建一个",
+            "请制作一个",
+            "请做一个",
+            "请来一个",
+            "请来个",
+            "请画一个",
+            "请画一幅",
+            "画一个",
+            "画一幅",
+            "画个",
+            "设计一个",
+            "设计一幅",
+            "生成一个",
+            "生成一幅",
+            "创建一个",
+            "制作一个",
+            "来一个",
+            "来个",
+            "做一个",
+            "做个",
+            "画",
+        ):
             if normalized.startswith(prefix):
                 normalized = normalized[len(prefix):]
                 break
@@ -260,6 +307,184 @@ class ScenePlanner:
             f"最近对象={json.dumps(recent, ensure_ascii=False)}",
         ])
 
+    def _parse_plan_content(self, content: str, text: str) -> ScenePlan:
+        result = self._coerce_scene_plan_payload(self._extract_json(content), text)
+        return ScenePlan.model_validate(result)
+
+    def _fallback_object(
+        self,
+        kind: str,
+        label: str,
+        role: str,
+        layer: int,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        render_strategy: str = "svg",
+        fill: Optional[str] = None,
+        text: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        style: Dict[str, Any] = {}
+        if fill:
+            style["fill"] = fill
+        if text:
+            style.update({
+                "text": text,
+                "font_size": 24,
+                "align": "center",
+                "vertical_align": "middle",
+            })
+
+        return {
+            "kind": kind,
+            "render_strategy": render_strategy,
+            "role": role,
+            "position": {"anchor": "custom", "x": x, "y": y, "layer": layer},
+            "size": {"preset": "medium", "width": width, "height": height},
+            "style": style,
+            "label": label,
+            "description": description or label,
+        }
+
+    def _fallback_scene_palette(self, raw: str) -> Dict[str, Any]:
+        if any(word in raw for word in ("赛博", "霓虹", "夜景", "夜晚", "暗黑")):
+            return {"fill": "#111827", "horizon_y": 390, "ground_fill": "#1F2937"}
+        if any(word in raw for word in ("海底", "水下", "海洋")):
+            return {"fill": "#0F766E", "horizon_y": 405, "ground_fill": "#115E59"}
+        if any(word in raw for word in ("太空", "宇宙", "星球")):
+            return {"fill": "#0B1026", "horizon_y": 430, "ground_fill": "#151A36"}
+        if any(word in raw for word in ("森林", "公园", "花园", "草地", "庭院")):
+            return {"fill": "#BAE6FD", "horizon_y": 365, "ground_fill": "#86EFAC"}
+        return {"fill": "#E0F2FE", "horizon_y": 395, "ground_fill": "#CBD5E1"}
+
+    def fallback_plan(self, text: str, reason: str = "") -> ScenePlan:
+        raw = "".join(str(text or "").split())
+        title = self._title_from_text(text)
+        scene_type = self._scene_type_from_text(text)
+        background = self._fallback_scene_palette(raw)
+        objects: List[Dict[str, Any]] = []
+
+        is_cyber = any(word in raw for word in ("赛博", "霓虹", "未来感", "科幻"))
+        is_indoor = any(word in raw for word in ("书房", "房间", "室内", "卧室", "办公室", "工作室", "图书馆", "书店", "咖啡馆", "餐厅"))
+        is_cafe = any(word in raw for word in ("咖啡", "餐厅", "茶", "杯"))
+        is_city = any(word in raw for word in ("城市", "街道", "赛博", "未来", "高楼", "广场", "小镇"))
+        is_nature = any(word in raw for word in ("森林", "公园", "花园", "草地", "庭院", "山", "海边", "湖", "河"))
+        is_space = any(word in raw for word in ("太空", "宇宙", "星球", "月球"))
+        is_underwater = any(word in raw for word in ("海底", "水下", "海洋"))
+
+        if is_underwater:
+            objects.extend([
+                self._fallback_object("water_surface", "水面", "background", 1, 400, 150, 560, 100, description="层叠的蓝绿色水面"),
+                self._fallback_object("fish", "鱼", "foreground", 4, 250, 310, 95, 70, description="水下游动的小鱼"),
+                self._fallback_object("fish", "鱼群", "foreground", 5, 560, 250, 80, 60, description="远处的小鱼"),
+                self._fallback_object("building", "海底城市", "midground", 3, 390, 395, 240, 190, description="被海水包围的城市建筑"),
+                self._fallback_object("plant_potted", "海草装饰", "foreground", 6, 120, 470, 95, 130, description="像海草一样摇曳的植物"),
+            ])
+        elif is_space:
+            objects.extend([
+                self._fallback_object("moon", "月亮", "background", 1, 640, 125, 120, 120),
+                self._fallback_object("star", "星星", "decoration", 2, 165, 110, 55, 55, "basic", fill="#FDE68A"),
+                self._fallback_object("star", "星星", "decoration", 2, 500, 95, 45, 45, "basic", fill="#FDE68A"),
+                self._fallback_object("circle", "星球", "midground", 3, 315, 330, 140, 140, "basic", fill="#7DD3FC"),
+                self._fallback_object("text", "标题", "label", 5, 400, 505, 360, 56, "basic", fill="#E0F2FE", text=title),
+            ])
+        elif is_city and not is_indoor:
+            objects.extend([
+                self._fallback_object("building", "高楼", "midground", 2, 220, 340, 150, 245),
+                self._fallback_object("building_office", "办公楼", "midground", 2, 450, 325, 170, 270),
+                self._fallback_object("road_straight", "道路", "foreground", 4, 400, 510, 560, 120),
+                self._fallback_object("street_light", "路灯", "foreground", 5, 650, 370, 85, 210),
+                self._fallback_object("car_sedan", "汽车", "foreground", 6, 300, 500, 145, 85),
+            ])
+        elif is_nature and not is_indoor:
+            objects.extend([
+                self._fallback_object("sun", "太阳", "background", 1, 650, 115, 115, 115),
+                self._fallback_object("cloud", "云", "background", 1, 230, 115, 150, 80),
+                self._fallback_object("tree_deciduous", "树", "midground", 3, 175, 380, 150, 230),
+                self._fallback_object("tree_pine", "松树", "midground", 3, 585, 385, 135, 235),
+                self._fallback_object("grass_patch", "草地", "foreground", 5, 400, 515, 420, 110),
+                self._fallback_object("flower_patch", "花丛", "foreground", 6, 285, 490, 145, 90),
+            ])
+        else:
+            objects.extend([
+                self._fallback_object("window", "窗户", "background", 1, 620, 165, 130, 120),
+                self._fallback_object("picture_frame", "墙面装饰", "background", 1, 190, 165, 110, 95),
+                self._fallback_object("table_desk" if not is_cafe else "table_dining", "桌子", "midground", 3, 405, 405, 300, 150),
+                self._fallback_object("chair_dining", "椅子", "midground", 3, 245, 430, 120, 145),
+                self._fallback_object("lamp_desk" if not is_cafe else "lamp_floor", "灯", "foreground", 5, 560, 335, 95, 145),
+                self._fallback_object("plant_potted", "绿植", "foreground", 5, 125, 435, 90, 135),
+            ])
+            if is_cafe:
+                objects.append(self._fallback_object("cup_coffee", "咖啡杯", "foreground", 6, 410, 335, 70, 70))
+            elif "猫" in raw:
+                objects.append(self._fallback_object("cat", "小猫", "foreground", 6, 540, 470, 95, 85))
+            else:
+                objects.append(self._fallback_object("bookshelf", "书架", "midground", 2, 285, 260, 150, 230))
+
+        if is_cyber:
+            background = {"fill": "#111827", "horizon_y": 390, "ground_fill": "#1F2937"}
+            objects.append(
+                self._fallback_object(
+                    "text",
+                    "霓虹标题",
+                    "label",
+                    7,
+                    400,
+                    90,
+                    360,
+                    64,
+                    "basic",
+                    fill="#22D3EE",
+                    text=title[:12],
+                    description="霓虹发光文字招牌",
+                )
+            )
+            objects.append(
+                self._fallback_object(
+                    "rect",
+                    "霓虹光带",
+                    "decoration",
+                    6,
+                    400,
+                    465,
+                    520,
+                    16,
+                    "basic",
+                    fill="#EC4899",
+                    description="横向霓虹灯带",
+                )
+            )
+
+        plan_payload = {
+            "scene_type": scene_type,
+            "title": title,
+            "style": "cartoon_flat",
+            "source": "llm_open_scene_fallback",
+            "background": background,
+            "objects": objects[:10],
+            "layout_notes": f"LLM 场景规划不可用时的素材兜底。{reason[:180]}",
+            "response": f"好的，我先按你的描述生成了{title}。",
+        }
+        return ScenePlan.model_validate(plan_payload)
+
+    async def _repair_or_fallback(
+        self,
+        text: str,
+        invalid_content: str,
+        error: str,
+        llm_config: LLMConfig,
+    ) -> ScenePlan:
+        try:
+            return await self._repair_plan(text, invalid_content, error, llm_config)
+        except ScenePlanningError as exc:
+            logger.warning("ScenePlanner repair failed, using fallback plan: %s", exc.reason)
+            return self.fallback_plan(text, exc.reason)
+        except Exception as exc:
+            logger.warning("ScenePlanner repair crashed, using fallback plan: %s", exc)
+            return self.fallback_plan(text, str(exc))
+
     async def plan(
         self,
         text: str,
@@ -271,6 +496,7 @@ class ScenePlanner:
         client = AsyncOpenAI(
             api_key=llm_config.api_key,
             base_url=llm_config.base_url,
+            timeout=75.0,
         )
         svg_catalog = resolver.catalog_summary()
 
@@ -287,28 +513,23 @@ class ScenePlanner:
                 {"role": "user", "content": text},
             ],
             temperature=0.45,
-            max_tokens=3200,
+            max_tokens=3600,
+            timeout=75.0,
         )
 
         content = response.choices[0].message.content or ""
         try:
-            result = self._coerce_scene_plan_payload(self._extract_json(content), text)
-            plan = ScenePlan.model_validate(result)
+            plan = self._parse_plan_content(content, text)
         except json.JSONDecodeError as exc:
-            logger.warning("ScenePlanner JSON parse failed: %s; content=%s", exc, content[:1000])
-            raise ScenePlanningError(
-                "我没能可靠规划这个场景，请换一种说法再试一次。",
-                "Scene Planner 返回内容不是有效 JSON",
-            ) from exc
+            logger.warning("ScenePlanner JSON parse failed, attempting repair: %s; content=%s", exc, content[:1000])
+            plan = await self._repair_or_fallback(text, content, str(exc), llm_config)
         except ValidationError as exc:
             logger.warning("ScenePlanner validation failed, attempting repair: %s; content=%s", exc, content[:1000])
-            plan = await self._repair_plan(text, content, str(exc), llm_config)
+            plan = await self._repair_or_fallback(text, content, str(exc), llm_config)
 
         if not plan.objects:
-            raise ScenePlanningError(
-                "我没有规划出可绘制的场景对象，请再说得具体一点。",
-                "ScenePlan objects 为空",
-            )
+            logger.warning("ScenePlanner returned empty objects, using fallback plan")
+            return self.fallback_plan(text, "ScenePlan objects 为空")
 
         return plan
 
@@ -322,6 +543,7 @@ class ScenePlanner:
         client = AsyncOpenAI(
             api_key=llm_config.api_key,
             base_url=llm_config.base_url,
+            timeout=75.0,
         )
 
         response = await client.chat.completions.create(
@@ -334,13 +556,13 @@ class ScenePlanner:
                 {"role": "user", "content": text},
             ],
             temperature=0.0,
-            max_tokens=3200,
+            max_tokens=3600,
+            timeout=75.0,
         )
 
         content = response.choices[0].message.content or ""
         try:
-            result = self._coerce_scene_plan_payload(self._extract_json(content), text)
-            return ScenePlan.model_validate(result)
+            return self._parse_plan_content(content, text)
         except (json.JSONDecodeError, ValidationError) as exc:
             raise ScenePlanningError(
                 "我规划出的场景结构不完整，请再描述一次你想画的场景。",

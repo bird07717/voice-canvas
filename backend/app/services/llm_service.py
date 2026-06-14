@@ -380,6 +380,33 @@ arguments: {"reason": "忽略原因"}
         executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
+    def _execute_scene_plan_response(
+        self,
+        scene_plan: Any,
+        canvas_context: Optional[Dict[str, Any]],
+        routing_reason: str,
+        reason: str = "scene_plan",
+    ) -> Dict[str, Any]:
+        commands = SceneExecutor(canvas_context).execute(scene_plan)
+        return {
+            "intent": "draw",
+            "confidence": 0.9,
+            "commands": commands,
+            "response": scene_plan.response or f"好的，我规划了{scene_plan.title}场景。",
+            "reason": reason,
+            "llm_route": "open_scene",
+            "llm_used": True,
+            "routing_reason": routing_reason,
+            "scene": {
+                "scene_type": scene_plan.scene_type,
+                "title": scene_plan.title,
+                "style": scene_plan.style,
+                "object_count": len(commands),
+                "layout_notes": scene_plan.layout_notes,
+                "source": scene_plan.source or "llm_open_scene",
+            },
+        }
+
     def _has_scene_patch_hint(self, text: str, scene_title: str, scene_type: str) -> bool:
         return has_scene_patch_hint(text, scene_title, scene_type)
 
@@ -564,54 +591,31 @@ arguments: {"reason": "忽略原因"}
             }
 
         if decision.route == "open_scene":
+            scene_planner = ScenePlanner()
             try:
-                scene_plan = await ScenePlanner().plan(
+                scene_plan = await scene_planner.plan(
                     text,
                     canvas_context,
                     config,
                     asset_resolver=self.asset_resolver,
                 )
-                commands = SceneExecutor(canvas_context).execute(scene_plan)
-                return {
-                    "intent": "draw",
-                    "confidence": 0.9,
-                    "commands": commands,
-                    "response": scene_plan.response or f"好的，我规划了{scene_plan.title}场景。",
-                    "reason": "scene_plan",
-                    "llm_route": "open_scene",
-                    "llm_used": True,
-                    "routing_reason": decision.reason,
-                    "scene": {
-                        "scene_type": scene_plan.scene_type,
-                        "title": scene_plan.title,
-                        "style": scene_plan.style,
-                        "object_count": len(commands),
-                        "layout_notes": scene_plan.layout_notes,
-                        "source": "llm_open_scene",
-                    },
-                }
+                return self._execute_scene_plan_response(scene_plan, canvas_context, decision.reason)
             except ScenePlanningError as e:
-                return {
-                    "intent": "clarify",
-                    "confidence": 0.0,
-                    "commands": [],
-                    "response": e.message,
-                    "reason": e.reason,
-                    "llm_route": "open_scene",
-                    "llm_used": True,
-                    "routing_reason": decision.reason,
-                }
+                scene_plan = scene_planner.fallback_plan(text, e.reason)
+                return self._execute_scene_plan_response(
+                    scene_plan,
+                    canvas_context,
+                    decision.reason,
+                    reason=f"scene_plan_fallback: {e.reason}",
+                )
             except Exception as e:
-                return {
-                    "intent": "clarify",
-                    "confidence": 0.0,
-                    "commands": [],
-                    "response": "我暂时没能完成场景规划，请再说一次或换个简单场景。",
-                    "reason": f"Scene Planner failed: {str(e)}",
-                    "llm_route": "open_scene",
-                    "llm_used": True,
-                    "routing_reason": decision.reason,
-                }
+                scene_plan = scene_planner.fallback_plan(text, f"Scene Planner failed: {str(e)}")
+                return self._execute_scene_plan_response(
+                    scene_plan,
+                    canvas_context,
+                    decision.reason,
+                    reason=f"scene_plan_fallback: {str(e)[:160]}",
+                )
 
         # 调用OpenAI API
         client = AsyncOpenAI(

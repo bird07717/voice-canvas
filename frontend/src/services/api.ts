@@ -118,7 +118,9 @@ class ApiService {
 
   // 语音命令相关
   async processVoiceCommand(data: VoiceCommandRequest): Promise<VoiceCommandResponse> {
-    const response = await this.client.post('/api/voice/command', data)
+    const response = await this.client.post('/api/voice/command', data, {
+      timeout: 90000,
+    })
     return response.data
   }
 

@@ -51,6 +51,16 @@ class ScenePlannerCoercionTest(unittest.TestCase):
         self.assertEqual(plan.scene_type, "cyberpunk_room")
         self.assertEqual(plan.objects[0].kind, "laptop")
 
+    def test_fallback_plan_returns_executable_scene(self):
+        planner = ScenePlanner()
+        plan = planner.fallback_plan("帮我画一个赛博朋克式的书房", "invalid json")
+
+        self.assertEqual(plan.source, "llm_open_scene_fallback")
+        self.assertEqual(plan.scene_type, "cyberpunk_room")
+        self.assertGreaterEqual(len(plan.objects), 5)
+        self.assertTrue(any(obj.kind == "text" for obj in plan.objects))
+        self.assertTrue(any(obj.render_strategy == "svg" for obj in plan.objects))
+
 
 if __name__ == "__main__":
     unittest.main()

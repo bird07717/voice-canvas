@@ -67,6 +67,7 @@ class ScenePlan(BaseModel):
     scene_type: str = Field(..., min_length=1)
     title: str = Field(..., min_length=1)
     style: str = "cartoon_flat"
+    source: Optional[str] = None
     background: Optional[SceneBackground] = None
     objects: List[SceneObject] = Field(default_factory=list)
     layout_notes: Optional[str] = None

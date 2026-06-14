@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from app.scene.intent import is_open_scene_request
+from app.scene.intent import is_open_visual_draw_request
 from app.scene.schemas import ScenePlan
 from app.scene.templates import build_template_scene_plan
 
@@ -107,11 +107,11 @@ def classify_llm_route(text: str, has_llm_config: bool = True) -> LLMRouteDecisi
             template_scene_plan=template_scene_plan,
         )
 
-    if is_open_scene_request(text):
+    if is_open_visual_draw_request(text):
         return LLMRouteDecision(
             route="open_scene" if has_llm_config else "requires_llm",
             requires_llm=True,
-            reason="开放场景请求，需要 LLM 规划语义场景",
+            reason="第三层通用开放绘画请求，需要 LLM 规划语义场景",
         )
 
     return LLMRouteDecision(
