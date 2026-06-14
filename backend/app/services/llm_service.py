@@ -8,6 +8,8 @@ from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
 from app.scene.intent import is_scene_request
+from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
+from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.planner import ScenePlanner, ScenePlanningError
 from app.scene.templates import build_template_scene_plan
 
@@ -344,6 +346,148 @@ arguments: {"reason": "忽略原因"}
         executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
+    def _has_scene_patch_hint(self, text: str, scene_title: str, scene_type: str) -> bool:
+        normalized = "".join(str(text or "").split()).lower()
+        title = "".join(scene_title.split()).lower()
+        scene = str(scene_type or "").lower()
+
+        if not normalized:
+            return False
+
+        command_prefixes = ("画一个", "画一幅", "画个", "生成一个", "生成一幅", "来一个", "创建一个")
+        bare_scene_phrases = {
+            title,
+            f"一个{title}",
+            f"一幅{title}",
+            f"画一个{title}",
+            f"画一幅{title}",
+            f"画个{title}",
+            f"生成一个{title}",
+            f"生成一幅{title}",
+            scene,
+        }
+        if normalized in bare_scene_phrases:
+            return False
+
+        patch_words = (
+            "加",
+            "添加",
+            "放",
+            "摆",
+            "带",
+            "有",
+            "不要",
+            "去掉",
+            "删除",
+            "移除",
+            "改",
+            "换",
+            "变",
+            "变成",
+            "旁边",
+            "左边",
+            "右边",
+            "上面",
+            "下面",
+            "文字",
+            "写",
+        )
+        if any(word in normalized for word in patch_words):
+            return True
+
+        for prefix in command_prefixes:
+            if normalized.startswith(prefix + title):
+                return len(normalized) > len(prefix + title)
+        return False
+
+    async def _apply_scene_patch_if_needed(
+        self,
+        text: str,
+        template_scene_plan: Any,
+        commands: List[Dict[str, Any]],
+        config: Optional[LLMConfig],
+        canvas_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        scene_payload = {
+            "scene_type": template_scene_plan.scene_type,
+            "title": template_scene_plan.title,
+            "style": template_scene_plan.style,
+            "object_count": len(commands),
+            "layout_notes": template_scene_plan.layout_notes,
+            "source": "template",
+        }
+
+        if not self._has_scene_patch_hint(text, template_scene_plan.title, template_scene_plan.scene_type):
+            return {
+                "commands": commands,
+                "response": template_scene_plan.response,
+                "reason": "scene_template",
+                "scene": scene_payload,
+            }
+
+        if not config:
+            scene_payload["patch_status"] = "skipped_no_llm_config"
+            return {
+                "commands": commands,
+                "response": template_scene_plan.response + " 额外描述需要配置 LLM 后才能继续细化。",
+                "reason": "scene_template_patch_skipped_no_llm_config",
+                "scene": scene_payload,
+            }
+
+        try:
+            patch_plan = await ScenePatchPlanner().plan(
+                text=text,
+                scene_type=template_scene_plan.scene_type,
+                title=template_scene_plan.title,
+                template_commands=commands,
+                llm_config=config,
+            )
+            patch_commands = ScenePatchExecutor(
+                scene_type=template_scene_plan.scene_type,
+                scene_title=template_scene_plan.title,
+                template_commands=commands,
+                canvas_context=canvas_context,
+            ).execute(patch_plan)
+        except ScenePatchPlanningError as e:
+            scene_payload["patch_status"] = "failed"
+            return {
+                "commands": commands,
+                "response": template_scene_plan.response + e.message,
+                "reason": e.reason,
+                "scene": scene_payload,
+            }
+        except Exception as e:
+            scene_payload["patch_status"] = "failed"
+            return {
+                "commands": commands,
+                "response": template_scene_plan.response + " 额外描述暂时没有应用成功。",
+                "reason": f"ScenePatch failed: {str(e)}",
+                "scene": scene_payload,
+            }
+
+        if not patch_commands:
+            scene_payload["patch_status"] = "empty"
+            return {
+                "commands": commands,
+                "response": template_scene_plan.response,
+                "reason": "scene_template_patch_empty",
+                "scene": scene_payload,
+            }
+
+        scene_payload.update(
+            {
+                "object_count": len(commands) + len(patch_commands),
+                "patch_status": "applied",
+                "patch_count": len(patch_commands),
+            }
+        )
+        return {
+            "commands": [*commands, *patch_commands],
+            "response": patch_plan.response or f"好的，我在{template_scene_plan.title}模板上应用了额外描述。",
+            "reason": "scene_template_patch",
+            "scene": scene_payload,
+        }
+
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
         """获取用户的激活LLM配置"""
         if not self.db:
@@ -379,20 +523,31 @@ arguments: {"reason": "忽略原因"}
         template_scene_plan = build_template_scene_plan(text)
         if template_scene_plan:
             commands = SceneExecutor(canvas_context).execute(template_scene_plan)
+            needs_patch = self._has_scene_patch_hint(
+                text,
+                template_scene_plan.title,
+                template_scene_plan.scene_type,
+            )
+            config = None
+            if needs_patch:
+                if llm_config_id:
+                    config = await self.get_config_by_id(llm_config_id)
+                else:
+                    config = await self.get_active_config(user_id)
+            patched = await self._apply_scene_patch_if_needed(
+                text=text,
+                template_scene_plan=template_scene_plan,
+                commands=commands,
+                config=config,
+                canvas_context=canvas_context,
+            )
             return {
                 "intent": "draw",
                 "confidence": 1.0,
-                "commands": commands,
-                "response": template_scene_plan.response,
-                "reason": "scene_template",
-                "scene": {
-                    "scene_type": template_scene_plan.scene_type,
-                    "title": template_scene_plan.title,
-                    "style": template_scene_plan.style,
-                    "object_count": len(commands),
-                    "layout_notes": template_scene_plan.layout_notes,
-                    "source": "template",
-                },
+                "commands": patched["commands"],
+                "response": patched["response"],
+                "reason": patched["reason"],
+                "scene": patched["scene"],
             }
 
         # 获取LLM配置

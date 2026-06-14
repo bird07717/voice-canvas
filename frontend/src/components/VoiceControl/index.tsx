@@ -26,6 +26,79 @@ type CommandExecutionOptions = {
 
 const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
 
+const translateSceneObject = (obj: CanvasObject, dx: number, dy: number): CanvasObject => {
+  const params = { ...(obj.params || {}) }
+
+  if (Array.isArray(params.points)) {
+    params.points = params.points.map((point: number, index: number) =>
+      index % 2 === 0 ? point + dx : point + dy
+    )
+  } else {
+    params.x = (params.x || 0) + dx
+    params.y = (params.y || 0) + dy
+  }
+
+  return {
+    ...obj,
+    params,
+    children: obj.children?.map((child) => translateSceneObject(child, dx, dy)),
+  }
+}
+
+const applySceneObjectParams = (obj: CanvasObject, updates: any): CanvasObject => {
+  let nextObject = obj
+
+  if (typeof updates?.dx === 'number' || typeof updates?.dy === 'number') {
+    nextObject = translateSceneObject(nextObject, updates.dx || 0, updates.dy || 0)
+  }
+
+  const scale = typeof updates?.scale_delta === 'number'
+    ? updates.scale_delta
+    : typeof updates?.scale === 'number'
+      ? updates.scale
+      : null
+
+  if (scale && scale > 0) {
+    nextObject = scaleSceneObject(nextObject, scale)
+  }
+
+  const filteredUpdates = Object.fromEntries(
+    Object.entries(updates || {}).filter(([key]) => !['dx', 'dy', 'scale', 'scale_delta'].includes(key))
+  )
+  const params = { ...(nextObject.params || {}), ...filteredUpdates }
+  const styleKeys = ['fill', 'stroke', 'strokeWidth', 'opacity']
+  const styleUpdates = Object.fromEntries(
+    Object.entries(filteredUpdates || {}).filter(([key]) => styleKeys.includes(key))
+  )
+
+  if (nextObject.type !== 'group' || Object.keys(styleUpdates).length === 0) {
+    return { ...nextObject, params }
+  }
+
+  return {
+    ...nextObject,
+    params,
+    children: nextObject.children?.map((child) => applySceneObjectParams(child, styleUpdates)),
+  }
+}
+
+const scaleSceneObject = (obj: CanvasObject, scale: number): CanvasObject => {
+  const params = { ...(obj.params || {}) }
+
+  if (typeof params.width === 'number') params.width = Math.max(8, params.width * scale)
+  if (typeof params.height === 'number') params.height = Math.max(8, params.height * scale)
+  if (typeof params.radius === 'number') params.radius = Math.max(6, params.radius * scale)
+  if (typeof params.innerRadius === 'number') params.innerRadius = Math.max(4, params.innerRadius * scale)
+  if (typeof params.outerRadius === 'number') params.outerRadius = Math.max(6, params.outerRadius * scale)
+  if (typeof params.fontSize === 'number') params.fontSize = Math.max(10, params.fontSize * scale)
+
+  return {
+    ...obj,
+    params,
+    children: obj.children?.map((child) => scaleSceneObject(child, scale)),
+  }
+}
+
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const {
     isListening,
@@ -298,19 +371,53 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   }
 
   const executeSceneCommands = async (commands: DrawCommand[]): Promise<CommandExecutionResult> => {
-    const sceneObjects = commands
-      .filter((command) => command.action === 'create' && command.type && command.id)
-      .map((command) => ({
-        id: command.id as string,
-        type: command.type as string,
-        params: command.params || {},
-        children: command.children,
-      }))
+    let lastCreatedId: string | null = null
+    let sceneObjects = commands
+      .reduce<CanvasObject[]>((objects, command) => {
+        if (command.action !== 'create' || !command.type || !command.id) return objects
+        lastCreatedId = command.id
+        objects.push({
+          id: command.id,
+          type: command.type,
+          params: command.params || {},
+          children: command.children,
+        })
+        return objects
+      }, [])
 
     if (sceneObjects.length === 0) {
       return {
         success: false,
         message: '没有可执行的场景命令',
+      }
+    }
+
+    for (const command of commands) {
+      if (command.action === 'modify' && command.target && command.params) {
+        const targetId = resolveSceneCommandTarget(command.target, lastCreatedId, sceneObjects)
+        if (targetId) {
+          sceneObjects = sceneObjects.map((obj) =>
+            obj.id === targetId ? applySceneObjectParams(obj, command.params) : obj
+          )
+        }
+      }
+
+      if (command.action === 'delete' && command.target) {
+        const targetId = resolveSceneCommandTarget(command.target, lastCreatedId, sceneObjects)
+        if (targetId) {
+          sceneObjects = sceneObjects.filter((obj) => obj.id !== targetId)
+        }
+      }
+
+      if (command.action === 'moveBy' && command.target && command.params) {
+        const targetId = resolveSceneCommandTarget(command.target, lastCreatedId, sceneObjects)
+        if (targetId) {
+          sceneObjects = sceneObjects.map((obj) =>
+            obj.id === targetId
+              ? translateSceneObject(obj, command.params?.dx || 0, command.params?.dy || 0)
+              : obj
+          )
+        }
       }
     }
 
@@ -321,6 +428,24 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       success: true,
       message: `已完成：生成 ${sceneObjects.length} 个场景对象`,
     }
+  }
+
+  const resolveSceneCommandTarget = (
+    target: string,
+    lastCreatedId: string | null,
+    sceneObjects: CanvasObject[]
+  ) => {
+    if (target === '__last__') return lastCreatedId || sceneObjects[sceneObjects.length - 1]?.id || null
+
+    if (target.startsWith('__kind__:')) {
+      const kind = target.replace('__kind__:', '').toLowerCase()
+      const matched = [...sceneObjects]
+        .reverse()
+        .find((obj) => obj.type?.toLowerCase() === kind || obj.params?.kind?.toLowerCase() === kind)
+      return matched?.id || null
+    }
+
+    return sceneObjects.some((obj) => obj.id === target) ? target : null
   }
 
   const appendLocalChat = (userText: string, assistantText: string, commands: DrawCommand[]) => {

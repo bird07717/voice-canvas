@@ -1,10 +1,34 @@
 import { useRef, useEffect, useState } from 'react'
-import { Stage, Layer, Circle, Rect, Line, Text, Star, Group } from 'react-konva'
+import { Stage, Layer, Circle, Rect, Line, Text, Star, Group, Image as KonvaImage } from 'react-konva'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { CanvasObject } from '@/types'
 
 const CANVAS_WIDTH = 800
 const CANVAS_HEIGHT = 600
+
+function CanvasImage(props: any) {
+  const { imageUrl, ...konvaProps } = props
+  const [image, setImage] = useState<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    if (!imageUrl) {
+      setImage(null)
+      return
+    }
+
+    const nextImage = new window.Image()
+    nextImage.crossOrigin = 'anonymous'
+    nextImage.onload = () => setImage(nextImage)
+    nextImage.onerror = () => setImage(null)
+    nextImage.src = imageUrl
+  }, [imageUrl])
+
+  if (!image) {
+    return <Rect {...konvaProps} fill={konvaProps.fill || '#E5E7EB'} stroke={konvaProps.stroke || '#94A3B8'} />
+  }
+
+  return <KonvaImage {...konvaProps} image={image} />
+}
 
 const translateChild = (child: CanvasObject, dx: number, dy: number): CanvasObject => {
   const params = { ...(child.params || {}) }
@@ -95,6 +119,15 @@ const getShapeBounds = (obj: CanvasObject) => {
     }
   }
 
+  if (obj.type === 'image') {
+    return {
+      x: params.x,
+      y: params.y,
+      width: Number(params.width || 0),
+      height: Number(params.height || 0),
+    }
+  }
+
   return {
     x: params.x,
     y: params.y,
@@ -129,6 +162,7 @@ const getObjectLabel = (obj: CanvasObject) => {
     grass: '草地',
     road: '道路',
     river: '河流',
+    image: '素材',
   }
 
   return labels[kind.toLowerCase()] || kind || '对象'
@@ -244,6 +278,9 @@ export default function CanvasBoard() {
 
       case 'text':
         return <Text {...commonProps} />
+
+      case 'image':
+        return <CanvasImage {...commonProps} />
 
       case 'star':
         return (
