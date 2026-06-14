@@ -346,6 +346,7 @@ interface CanvasState {
   lastCreatedObjectId: string | null
   lastModifiedObjectId: string | null
   selectedObjectId: string | null
+  disambiguationCandidateIds: string[]
   recentCommands: any[]
   history: any[][]
   historyStep: number
@@ -355,6 +356,8 @@ interface CanvasState {
   setCurrentCanvasId: (id: number | null) => void
   setCanvasObjects: (objects: any[]) => void
   setSelectedObjectId: (id: string | null) => void
+  setDisambiguationCandidates: (ids: string[]) => void
+  clearDisambiguationCandidates: () => void
   recordCommands: (commands: any[]) => void
   addObject: (object: any, options?: AddObjectOptions) => void
   replaceSceneObjects: (objects: any[]) => void
@@ -374,6 +377,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   lastCreatedObjectId: null,
   lastModifiedObjectId: null,
   selectedObjectId: null,
+  disambiguationCandidateIds: [],
   recentCommands: [],
   history: [[]],
   historyStep: 0,
@@ -385,6 +389,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setCanvasObjects: (objects) => set({ canvasObjects: objects }),
 
   setSelectedObjectId: (id) => set({ selectedObjectId: id }),
+
+  setDisambiguationCandidates: (ids) => set({ disambiguationCandidateIds: ids }),
+
+  clearDisambiguationCandidates: () => set({ disambiguationCandidateIds: [] }),
 
   recordCommands: (commands) =>
     set((state) => ({
@@ -415,6 +423,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       lastCreatedObjectId: lastObjectId,
       lastModifiedObjectId: lastObjectId,
       selectedObjectId: null,
+      disambiguationCandidateIds: [],
     }))
     get().saveToHistory()
   },
@@ -432,6 +441,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({
       canvasObjects: state.canvasObjects.filter((obj) => obj.id !== id),
       selectedObjectId: state.selectedObjectId === id ? null : state.selectedObjectId,
+      disambiguationCandidateIds: state.disambiguationCandidateIds.filter((candidateId) => candidateId !== id),
     }))
     get().saveToHistory()
   },
@@ -442,6 +452,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       lastCreatedObjectId: null,
       lastModifiedObjectId: null,
       selectedObjectId: null,
+      disambiguationCandidateIds: [],
       recentCommands: [],
     })
     get().saveToHistory()
@@ -456,6 +467,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
         lastModifiedObjectId: null,
         selectedObjectId: null,
+        disambiguationCandidateIds: [],
       })
     }
   },
@@ -469,6 +481,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         canvasObjects: JSON.parse(JSON.stringify(history[newStep])),
         lastModifiedObjectId: null,
         selectedObjectId: null,
+        disambiguationCandidateIds: [],
       })
     }
   },
@@ -494,6 +507,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         lastCreatedObjectId: json.objects[json.objects.length - 1]?.id || null,
         lastModifiedObjectId: null,
         selectedObjectId: null,
+        disambiguationCandidateIds: [],
         recentCommands: [],
       })
     }

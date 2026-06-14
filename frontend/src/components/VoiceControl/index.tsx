@@ -6,7 +6,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
+import { PENDING_TARGET, isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
 import {
   buildMoveByUpdates,
   buildMoveToUpdates,
@@ -30,7 +30,16 @@ type CommandExecutionOptions = {
   deferHistory?: boolean
 }
 
+type PendingDisambiguation = {
+  commands: DrawCommand[]
+  candidates: string[]
+  userText: string
+  interpretation: string
+  createdAt: number
+}
+
 const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
+const DISAMBIGUATION_TIMEOUT_MS = 30000
 
 const translateSceneObject = (obj: CanvasObject, dx: number, dy: number): CanvasObject => {
   const params = { ...(obj.params || {}) }
@@ -137,11 +146,14 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     redo,
     recordCommands,
     setSelectedObjectId,
+    setDisambiguationCandidates,
+    clearDisambiguationCandidates,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
   const lastFinalTimeRef = useRef(0)
   const commandSequenceRef = useRef(0)
+  const pendingDisambiguationRef = useRef<PendingDisambiguation | null>(null)
 
   useEffect(() => {
     // 初始化语音服务
@@ -229,6 +241,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
   const handleResetVoice = () => {
     commandSequenceRef.current += 1
+    pendingDisambiguationRef.current = null
+    clearDisambiguationCandidates()
     voiceService.stopListening()
     setIsListening(false)
     resetVoiceFeedback()
@@ -243,11 +257,38 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     const isCurrentCommand = () => commandSequenceRef.current === commandSequence
 
     const canvasContext = buildCanvasContext()
+
+    if (pendingDisambiguationRef.current) {
+      const completed = handleDisambiguationReply(text)
+      if (completed) return
+    }
+
     const fastCommand = matchFastCommand(text, canvasContext)
 
     if (fastCommand.matched) {
       setLastCommandSource('fast')
       setInterpretedText(fastCommand.interpretation || '')
+
+      if (fastCommand.needsDisambiguation && fastCommand.pendingCommands?.length) {
+        const candidates = (fastCommand.candidates || [])
+          .map((candidate) => candidate.objectId)
+          .filter(Boolean)
+
+        if (candidates.length) {
+          pendingDisambiguationRef.current = {
+            commands: fastCommand.pendingCommands,
+            candidates,
+            userText: text,
+            interpretation: fastCommand.interpretation || '确认目标对象',
+            createdAt: Date.now(),
+          }
+          setDisambiguationCandidates(candidates)
+          setStatus('matched')
+          setErrorMessage('')
+          setExecutionMessage(fastCommand.message || buildDisambiguationPrompt(candidates))
+          return
+        }
+      }
 
       if (fastCommand.errorMessage) {
         setStatus('error')
@@ -271,6 +312,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         }
 
         if (fastCommand.commands?.length) {
+          clearPendingDisambiguation()
           setStatus('drawing')
           const result = executeCommands(fastCommand.commands)
           if (!result.success) {
@@ -480,6 +522,150 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       })
     )
   }
+
+  const clearPendingDisambiguation = () => {
+    pendingDisambiguationRef.current = null
+    clearDisambiguationCandidates()
+  }
+
+  const handleDisambiguationReply = (text: string) => {
+    const pending = pendingDisambiguationRef.current
+    if (!pending) return false
+
+    if (Date.now() - pending.createdAt > DISAMBIGUATION_TIMEOUT_MS) {
+      clearPendingDisambiguation()
+      return false
+    }
+
+    const targetId = resolveDisambiguationTarget(text, pending.candidates)
+    if (!targetId) {
+      if (/取消|重说|算了|不用/.test(text)) {
+        clearPendingDisambiguation()
+        setStatus('idle')
+        setExecutionMessage('已取消目标确认')
+        setErrorMessage('')
+        return true
+      }
+
+      setStatus('matched')
+      setErrorMessage('')
+      setExecutionMessage(buildDisambiguationPrompt(pending.candidates))
+      return true
+    }
+
+    const resolvedCommands = replacePendingTarget(pending.commands, targetId)
+    clearPendingDisambiguation()
+    setLastCommandSource('fast')
+    setInterpretedText(`${pending.interpretation}：已确认目标`)
+    setStatus('drawing')
+
+    const result = executeCommands(resolvedCommands)
+    if (!result.success) {
+      setStatus('error')
+      setErrorMessage(result.message)
+      setExecutionMessage('')
+      return true
+    }
+
+    recordCommands(resolvedCommands)
+    appendLocalChat(
+      `${pending.userText}；确认：${text}`,
+      result.message || '已完成',
+      resolvedCommands
+    )
+    setStatus('done')
+    setExecutionMessage(result.message || '已完成')
+    return true
+  }
+
+  const buildDisambiguationPrompt = (candidateIds: string[]) =>
+    `找到 ${candidateIds.length} 个可能对象，请说第几个、左边那个或右边那个。`
+
+  const normalizeReplyText = (text: string) =>
+    text.trim().replace(/[，。！？、,.!?:：\s]/g, '')
+
+  const resolveDisambiguationTarget = (text: string, candidateIds: string[]) => {
+    const normalized = normalizeReplyText(text)
+    const state = useCanvasStore.getState()
+
+    const selectedCandidate = state.selectedObjectId && candidateIds.includes(state.selectedObjectId)
+      ? state.selectedObjectId
+      : null
+    if (/^(这个|当前|选中|就这个|是这个)$/.test(normalized) && selectedCandidate) {
+      return selectedCandidate
+    }
+
+    const ordinalIndex = parseOrdinalIndex(normalized)
+    if (ordinalIndex !== null && candidateIds[ordinalIndex]) {
+      return candidateIds[ordinalIndex]
+    }
+
+    const candidateObjects = candidateIds
+      .map((id) => {
+        const obj = state.canvasObjects.find((item) => item.id === id)
+        const bounds = obj ? getObjectBounds(obj) : null
+        return obj && bounds
+          ? {
+              id,
+              centerX: bounds.x + bounds.width / 2,
+              centerY: bounds.y + bounds.height / 2,
+              area: bounds.width * bounds.height,
+            }
+          : null
+      })
+      .filter(Boolean) as Array<{ id: string; centerX: number; centerY: number; area: number }>
+
+    if (!candidateObjects.length) return null
+
+    if (/左边|左侧|最左/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => a.centerX - b.centerX)[0]?.id || null
+    }
+    if (/右边|右侧|最右/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => b.centerX - a.centerX)[0]?.id || null
+    }
+    if (/上面|上边|顶部|最上/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => a.centerY - b.centerY)[0]?.id || null
+    }
+    if (/下面|下边|底部|最下/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => b.centerY - a.centerY)[0]?.id || null
+    }
+    if (/最大|大的/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => b.area - a.area)[0]?.id || null
+    }
+    if (/最小|小的/.test(normalized)) {
+      return [...candidateObjects].sort((a, b) => a.area - b.area)[0]?.id || null
+    }
+
+    return null
+  }
+
+  const parseOrdinalIndex = (text: string) => {
+    const digitMatch = text.match(/第?([1-5一二三四五])个?/)
+    const raw = digitMatch?.[1]
+    if (!raw) return null
+
+    const map: Record<string, number> = {
+      '1': 0,
+      '2': 1,
+      '3': 2,
+      '4': 3,
+      '5': 4,
+      一: 0,
+      二: 1,
+      三: 2,
+      四: 3,
+      五: 4,
+    }
+    return map[raw] ?? null
+  }
+
+  const replacePendingTarget = (commands: DrawCommand[], targetId: string): DrawCommand[] =>
+    commands.map((command) => ({
+      ...command,
+      target: command.target === PENDING_TARGET ? targetId : command.target,
+      children: command.children,
+      params: command.params,
+    }))
 
   const buildCanvasContext = (): CanvasCommandContext => {
     const state = useCanvasStore.getState()
