@@ -1,4 +1,5 @@
 import { CanvasCommandContext, DrawCommand } from '@/types'
+import { detectKindQuery, detectSpatialHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
 
 export type FastCommandResult = {
   matched: boolean
@@ -104,93 +105,13 @@ const hasExplicitColor = (text: string) =>
 const getShapeColor = (text: string) =>
   parseColor(text, '#60a5fa')
 
-const resolveContextTarget = (context: CanvasCommandContext) =>
-  context.selectedObjectId ||
-  context.lastModifiedObjectId ||
-  context.lastCreatedObjectId ||
-  context.objects[context.objects.length - 1]?.id ||
-  null
-
-const KIND_ALIASES: Array<[RegExp, string[], string]> = [
-  [/圆|圆形/, ['circle', 'round'], '圆形'],
-  [/矩形|长方形|方块|方形|正方形/, ['rect', 'rectangle', 'square'], '矩形'],
-  [/线|直线|线条/, ['line'], '线条'],
-  [/星星|五角星/, ['star'], '星星'],
-  [/文字|文本|字/, ['text'], '文字'],
-  [/房子/, ['house'], '房子'],
-  [/树/, ['tree'], '树'],
-  [/太阳/, ['sun'], '太阳'],
-  [/云/, ['cloud'], '云'],
-  [/花/, ['flower'], '花'],
-  [/人|小人/, ['person'], '小人'],
-  [/车|汽车/, ['car'], '汽车'],
-  [/山|山峰/, ['mountain'], '山'],
-  [/草|草地/, ['grass'], '草地'],
-  [/路|道路|小路/, ['road'], '道路'],
-  [/河|河流|海|海面/, ['river'], '河流'],
-]
-
-const getTargetDirection = (text: string) => {
-  if (/左边|最左|左侧/.test(text)) return 'left'
-  if (/右边|最右|右侧/.test(text)) return 'right'
-  if (/上边|最上|上面|顶部/.test(text)) return 'top'
-  if (/下边|最下|下面|底部/.test(text)) return 'bottom'
-  if (/中间|中央|中心/.test(text)) return 'center'
-  return null
-}
-
 const findTargetByKind = (text: string, context: CanvasCommandContext) => {
-  const alias = KIND_ALIASES.find(([pattern]) => pattern.test(text))
-  if (!alias) return null
-
-  const [, kinds, label] = alias
-  const matchedObjects = context.objects.filter((obj) => {
-      const type = String(obj.type || '').toLowerCase()
-      const kind = String(obj.kind || '').toLowerCase()
-      const kindLabel = String(obj.kindLabel || '')
-      return kinds.includes(type) || kinds.includes(kind) || kindLabel.includes(label)
-    })
-
-  if (!matchedObjects.length) return null
-
-  const direction = getTargetDirection(text)
-  const matched = pickObjectByDirection(matchedObjects, direction)
-  return matched?.id || null
-}
-
-const pickObjectByDirection = (
-  objects: CanvasCommandContext['objects'],
-  direction: string | null
-) => {
-  if (!direction) return [...objects].reverse()[0]
-
-  const withPosition = objects.filter(
-    (obj) => typeof obj.x === 'number' && typeof obj.y === 'number'
-  )
-  const candidates = withPosition.length ? withPosition : objects
-
-  if (direction === 'left') {
-    return [...candidates].sort((a, b) => (a.x ?? 0) - (b.x ?? 0))[0]
-  }
-  if (direction === 'right') {
-    return [...candidates].sort((a, b) => (b.x ?? 0) - (a.x ?? 0))[0]
-  }
-  if (direction === 'top') {
-    return [...candidates].sort((a, b) => (a.y ?? 0) - (b.y ?? 0))[0]
-  }
-  if (direction === 'bottom') {
-    return [...candidates].sort((a, b) => (b.y ?? 0) - (a.y ?? 0))[0]
-  }
-
-  return [...candidates].sort((a, b) => {
-    const aDistance = Math.abs((a.x ?? 400) - 400) + Math.abs((a.y ?? 300) - 300)
-    const bDistance = Math.abs((b.x ?? 400) - 400) + Math.abs((b.y ?? 300) - 300)
-    return aDistance - bDistance
-  })[0]
+  if (!detectKindQuery(text) && !detectSpatialHint(text)) return null
+  return resolveObjectTarget({ rawText: text }, context).objectId
 }
 
 const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>
-  findTargetByKind(text, context) || resolveContextTarget(context)
+  resolveObjectTarget({ rawText: text }, context).objectId
 
 const commandResult = (
   interpretation: string,
@@ -277,7 +198,7 @@ export function matchFastCommand(
 
   const selectTarget = findTargetByKind(text, context)
   if (/^(选中|选择|选一下|点一下|点选).+/.test(text)) {
-    const target = selectTarget || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context) : null)
+    const target = selectTarget || (/最后|刚才|上一个|当前|这个|它/.test(text) ? resolveContextTarget(context).objectId : null)
     if (!target) {
       return {
         matched: true,

@@ -70,6 +70,12 @@ export interface CanvasContextObject {
   width?: number
   height?: number
   radius?: number
+  centerX?: number
+  centerY?: number
+  area?: number
+  sceneType?: string
+  sceneRole?: string
+  idHint?: string
 }
 
 export interface CanvasCommandContext {
