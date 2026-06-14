@@ -24,8 +24,6 @@ type CommandExecutionOptions = {
   deferHistory?: boolean
 }
 
-const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
-
 const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
@@ -52,18 +50,19 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const { activeConfig, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
   const {
     addObject,
+    replaceSceneObjects,
     updateObject,
     removeObject,
     clearCanvas,
     undo,
     redo,
     recordCommands,
-    saveToHistory,
     setSelectedObjectId,
   } = useCanvasStore()
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
   const lastFinalTimeRef = useRef(0)
+  const commandSequenceRef = useRef(0)
 
   useEffect(() => {
     // 初始化语音服务
@@ -150,6 +149,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   }
 
   const handleResetVoice = () => {
+    commandSequenceRef.current += 1
     voiceService.stopListening()
     setIsListening(false)
     resetVoiceFeedback()
@@ -159,6 +159,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const handleVoiceCommand = async (text: string) => {
     const canvasState = useCanvasStore.getState()
     if (!canvasState.currentCanvasId || !text.trim()) return
+    const commandSequence = commandSequenceRef.current + 1
+    commandSequenceRef.current = commandSequence
+    const isCurrentCommand = () => commandSequenceRef.current === commandSequence
 
     const canvasContext = buildCanvasContext()
     const fastCommand = matchFastCommand(text, canvasContext)
@@ -182,6 +185,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
           const completed = await executeControlAction(fastCommand.controlAction)
           if (!completed) return
           appendLocalChat(text, fastCommand.message || fastCommand.interpretation || '已完成', [])
+          if (!isCurrentCommand()) return
           setStatus('done')
           setExecutionMessage(fastCommand.message || '已完成')
           return
@@ -234,6 +238,10 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         canvas_context: canvasContext,
       })
 
+      if (!isCurrentCommand()) {
+        return
+      }
+
       if (response.intent === 'ignore') {
         setStatus('done')
         setExecutionMessage('已忽略无效语音')
@@ -276,34 +284,42 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
           : response.response || '已完成'
       )
     } catch (error: any) {
+      if (!isCurrentCommand()) {
+        return
+      }
       setStatus('error')
       setErrorMessage(error.response?.data?.detail || '处理命令失败')
       setExecutionMessage('')
     } finally {
-      setIsProcessing(false)
+      if (isCurrentCommand()) {
+        setIsProcessing(false)
+      }
     }
   }
 
   const executeSceneCommands = async (commands: DrawCommand[]): Promise<CommandExecutionResult> => {
-    let successCount = 0
+    const sceneObjects = commands
+      .filter((command) => command.action === 'create' && command.type && command.id)
+      .map((command) => ({
+        id: command.id as string,
+        type: command.type as string,
+        params: command.params || {},
+        children: command.children,
+      }))
 
-    for (const [index, command] of commands.entries()) {
-      setExecutionMessage(`正在绘制场景：${index + 1} / ${commands.length}`)
-      await wait(60)
-      const result = executeCommands([command], { deferHistory: true })
-      if (!result.success) {
-        return result
+    if (sceneObjects.length === 0) {
+      return {
+        success: false,
+        message: '没有可执行的场景命令',
       }
-      successCount += 1
     }
 
-    saveToHistory()
+    setExecutionMessage(`正在替换场景：${sceneObjects.length} 个对象`)
+    replaceSceneObjects(sceneObjects)
 
     return {
-      success: successCount > 0,
-      message: successCount > 0
-        ? `已完成：执行 ${successCount} 个命令`
-        : '没有可执行的场景命令',
+      success: true,
+      message: `已完成：生成 ${sceneObjects.length} 个场景对象`,
     }
   }
 

@@ -357,6 +357,7 @@ interface CanvasState {
   setSelectedObjectId: (id: string | null) => void
   recordCommands: (commands: any[]) => void
   addObject: (object: any, options?: AddObjectOptions) => void
+  replaceSceneObjects: (objects: any[]) => void
   updateObject: (id: string, updates: any) => void
   removeObject: (id: string) => void
   clearCanvas: () => void
@@ -400,6 +401,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (!options?.deferHistory) {
       get().saveToHistory()
     }
+  },
+
+  replaceSceneObjects: (objects) => {
+    const clonedObjects = JSON.parse(JSON.stringify(objects || []))
+    const lastObjectId = clonedObjects[clonedObjects.length - 1]?.id || null
+
+    set((state) => ({
+      canvasObjects: [
+        ...state.canvasObjects.filter((obj) => !obj.params?.sceneType),
+        ...clonedObjects,
+      ],
+      lastCreatedObjectId: lastObjectId,
+      lastModifiedObjectId: lastObjectId,
+      selectedObjectId: null,
+    }))
+    get().saveToHistory()
   },
 
   updateObject: (id, updates) => {
