@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button, Space, message, Tag } from 'antd'
-import { AudioOutlined, AudioMutedOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
+import {
+  AudioMutedOutlined,
+  AudioOutlined,
+  DownOutlined,
+  PictureOutlined,
+  ReloadOutlined,
+  UpOutlined,
+} from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
 import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
@@ -44,7 +51,19 @@ type PreparedCommandsResult =
   | { status: 'pending' }
   | { status: 'error'; message: string }
 
-const SCENE_SHORTCUTS = ['海边日落', '公园', '生日贺卡', '城市夜景', '森林小屋']
+const SCENE_SHORTCUTS = [
+  { title: '海边日落', tone: '暖阳海面' },
+  { title: '公园', tone: '草地长椅' },
+  { title: '生日贺卡', tone: '蛋糕礼物' },
+  { title: '城市夜景', tone: '楼宇车流' },
+  { title: '森林小屋', tone: '树木小屋' },
+  { title: '山水风景', tone: '远山河流' },
+  { title: '教室', tone: '黑板课桌' },
+  { title: '温馨客厅', tone: '沙发窗景' },
+  { title: '桌面工作区', tone: '电脑书桌' },
+  { title: '节日派对', tone: '彩带灯笼' },
+]
+const COLLAPSED_SCENE_COUNT = 5
 const DISAMBIGUATION_TIMEOUT_MS = 30000
 
 const translateSceneObject = (obj: CanvasObject, dx: number, dy: number): CanvasObject => {
@@ -121,6 +140,7 @@ const scaleSceneObject = (obj: CanvasObject, scale: number): CanvasObject => {
 }
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
+  const [scenesExpanded, setScenesExpanded] = useState(false)
   const {
     isListening,
     status,
@@ -1150,18 +1170,34 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
           取消/重说
         </Button>
 
-        <Space wrap size={[8, 8]}>
-          {SCENE_SHORTCUTS.map((scene) => (
+        <div className="scene-shortcuts">
+          <div className="scene-shortcuts-header">
+            <span>场景模板</span>
             <Button
-              key={scene}
-              icon={<PictureOutlined />}
+              type="text"
               size="small"
-              onClick={() => handleVoiceCommand(`画一个${scene}`)}
+              icon={scenesExpanded ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setScenesExpanded((expanded) => !expanded)}
             >
-              {scene}
+              {scenesExpanded ? '收起' : '展开'}
             </Button>
-          ))}
-        </Space>
+          </div>
+          <div className="scene-shortcuts-grid">
+            {SCENE_SHORTCUTS
+              .slice(0, scenesExpanded ? SCENE_SHORTCUTS.length : COLLAPSED_SCENE_COUNT)
+              .map((scene) => (
+                <Button
+                  key={scene.title}
+                  icon={<PictureOutlined />}
+                  className="scene-shortcut-button"
+                  onClick={() => handleVoiceCommand(`画一个${scene.title}`)}
+                >
+                  <span className="scene-shortcut-title">{scene.title}</span>
+                  <span className="scene-shortcut-tone">{scene.tone}</span>
+                </Button>
+              ))}
+          </div>
+        </div>
 
         <div className="voice-feedback-panel">
           <div className="voice-feedback-row">
