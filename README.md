@@ -11,7 +11,7 @@ Voice Canvas 是一个面向自然语言语音交互的 AI 绘图系统。用户
 ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-4169e1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Deploy-Docker-2496ed?logo=docker&logoColor=white)
 
-## 📹 演示视频
+## 📹 演示视频 ：哔哩哔哩：https://www.bilibili.com/video/BV1iTJK6hE95/
 
 视频地址：
 
