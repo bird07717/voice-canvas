@@ -1,5 +1,6 @@
 from itertools import count
 from typing import Any, Dict, Iterable, List, Optional
+from uuid import uuid4
 
 from app.assets.resolver import AssetResolver
 from app.drawing.executor import DrawingExecutor
@@ -59,6 +60,7 @@ class ScenePatchExecutor:
         self.asset_resolver = asset_resolver or AssetResolver()
         self.drawing_executor = DrawingExecutor(canvas_context)
         self._id_counter = count(1)
+        self._id_prefix = f"patch_{uuid4().hex[:8]}"
 
     def execute(self, plan: ScenePatchPlan) -> List[Dict[str, Any]]:
         commands: List[Dict[str, Any]] = []
@@ -238,7 +240,7 @@ class ScenePatchExecutor:
         return operation.size.width or width, operation.size.height or height
 
     def _next_patch_id(self) -> str:
-        return f"patch_{next(self._id_counter)}"
+        return f"{self._id_prefix}_{next(self._id_counter)}"
 
     def _rewrite_command_ids(self, command: Dict[str, Any]) -> None:
         command["id"] = self._next_patch_id()

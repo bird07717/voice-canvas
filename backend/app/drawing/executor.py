@@ -1,5 +1,6 @@
 from itertools import count
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from app.drawing.schemas import (
     AskClarificationArgs,
@@ -84,6 +85,7 @@ COLOR_ALIASES = {
 class DrawingExecutor:
     def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self._id_counter = count(1)
+        self._id_prefix = f"obj_{uuid4().hex[:8]}"
         self.canvas_context = canvas_context or {}
 
     def execute(self, plan: DrawingPlan) -> Dict[str, Any]:
@@ -407,7 +409,7 @@ class DrawingExecutor:
         return COLOR_ALIASES.get(color, color)
 
     def _next_id(self) -> str:
-        return f"obj_{next(self._id_counter)}"
+        return f"{self._id_prefix}_{next(self._id_counter)}"
 
     def _normalize_template_kind(self, kind: str) -> str:
         aliases = {
