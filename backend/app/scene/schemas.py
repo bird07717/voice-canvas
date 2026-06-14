@@ -18,6 +18,8 @@ SceneAnchor = Literal[
 ]
 SceneSizePreset = Literal["tiny", "small", "medium", "large", "huge", "wide", "tall"]
 SceneRenderStrategy = Literal["basic", "template", "svg"]
+SceneTextAlign = Literal["left", "center", "right"]
+SceneVerticalAlign = Literal["top", "middle", "bottom"]
 
 
 class SceneBackground(BaseModel):
@@ -45,6 +47,8 @@ class SceneStyle(BaseModel):
     opacity: Optional[float] = Field(default=None, ge=0, le=1)
     text: Optional[str] = None
     font_size: Optional[float] = Field(default=None, gt=0)
+    align: Optional[SceneTextAlign] = None
+    vertical_align: Optional[SceneVerticalAlign] = None
 
 
 class SceneObject(BaseModel):

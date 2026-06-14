@@ -54,8 +54,7 @@ SCENE_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"kind": "balloon", "role": "decoration", "position": {"anchor": "custom", "x": 620, "y": 252, "layer": 5}, "size": {"preset": "small", "width": 92, "height": 122}, "label": "右侧气球"},
             {"kind": "text", "render_strategy": "basic", "role": "label", "position": {"anchor": "custom", "x": 400, "y": 222, "layer": 6}, "size": {"preset": "wide", "width": 420, "height": 72}, "style": {"fill": "#BE123C", "text": "生日快乐", "font_size": 38}, "label": "生日快乐"},
             {"kind": "cake", "role": "foreground", "position": {"anchor": "custom", "x": 400, "y": 365, "layer": 7}, "size": {"preset": "large", "width": 188, "height": 162}, "label": "生日蛋糕"},
-            {"kind": "gift", "role": "foreground", "position": {"anchor": "custom", "x": 270, "y": 452, "layer": 8}, "size": {"preset": "small", "width": 82, "height": 82}, "label": "礼物"},
-            {"kind": "gift_box", "role": "foreground", "position": {"anchor": "custom", "x": 530, "y": 452, "layer": 8}, "size": {"preset": "small", "width": 82, "height": 82}, "label": "礼盒"},
+            {"kind": "gift_box", "role": "foreground", "position": {"anchor": "custom", "x": 520, "y": 452, "layer": 8}, "size": {"preset": "small", "width": 82, "height": 82}, "label": "礼盒"},
             {"kind": "heart", "role": "decoration", "position": {"anchor": "custom", "x": 255, "y": 172, "layer": 9}, "size": {"preset": "tiny", "width": 42, "height": 42}, "label": "爱心"},
             {"kind": "star", "role": "decoration", "position": {"anchor": "custom", "x": 548, "y": 172, "layer": 9}, "size": {"preset": "tiny", "width": 40, "height": 40}, "label": "星星"},
         ],
@@ -116,8 +115,8 @@ SCENE_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "simple_classroom": {
         "scene_type": "simple_classroom",
         "default_objects": [
-            {"kind": "rect", "role": "background", "position": {"anchor": "top", "layer": 1}, "size": {"preset": "wide", "height": 150}, "style": {"fill": "#14532D", "stroke": "#052E16"}, "label": "黑板"},
-            {"kind": "text", "role": "label", "position": {"anchor": "top", "layer": 2}, "size": {"preset": "wide", "height": 60}, "style": {"fill": "#FFFFFF", "text": "欢迎上课"}, "label": "黑板文字"},
+            {"kind": "rect", "render_strategy": "basic", "role": "background", "position": {"anchor": "custom", "x": 400, "y": 110, "layer": 1}, "size": {"preset": "wide", "width": 560, "height": 150}, "style": {"fill": "#14532D", "stroke": "#052E16"}, "label": "黑板"},
+            {"kind": "text", "render_strategy": "basic", "role": "label", "position": {"anchor": "custom", "x": 400, "y": 112, "layer": 2}, "size": {"preset": "wide", "width": 500, "height": 64}, "style": {"fill": "#FFFFFF", "text": "欢迎上课", "font_size": 34, "align": "center", "vertical_align": "middle"}, "label": "黑板文字"},
             {"kind": "rect", "role": "midground", "position": {"anchor": "bottom_left", "layer": 3}, "size": {"preset": "small"}, "style": {"fill": "#D97706"}, "label": "课桌"},
             {"kind": "rect", "role": "midground", "position": {"anchor": "bottom", "layer": 3}, "size": {"preset": "small"}, "style": {"fill": "#D97706"}, "label": "课桌"},
             {"kind": "rect", "role": "midground", "position": {"anchor": "bottom_right", "layer": 3}, "size": {"preset": "small"}, "style": {"fill": "#D97706"}, "label": "课桌"},

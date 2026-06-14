@@ -194,6 +194,7 @@ class SceneExecutor:
         commands = self.drawing_executor._create_object(args)
         for command in commands:
             self._attach_scene_metadata(command, scene_object, plan)
+            self._attach_text_layout(command, scene_object)
         return commands
 
     def _create_svg_scene_object(
@@ -304,6 +305,19 @@ class SceneExecutor:
 
         if scene_object.id_hint:
             params["idHint"] = scene_object.id_hint
+
+    def _attach_text_layout(self, command: Dict[str, Any], scene_object: SceneObject) -> None:
+        if command.get("type") != "text":
+            return
+
+        params = command.setdefault("params", {})
+        width, height = self._resolve_size(scene_object)
+        params["width"] = width
+        params["height"] = height
+        if scene_object.style.align:
+            params["align"] = scene_object.style.align
+        if scene_object.style.vertical_align:
+            params["verticalAlign"] = scene_object.style.vertical_align
 
     def _normalize_kind(self, kind: str) -> str:
         aliases = {
