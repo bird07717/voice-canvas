@@ -53,9 +53,9 @@ const BASE_KIND_PROFILES: Record<string, Partial<ObjectSemanticProfile> & { alia
   group: { category: 'group', aliases: ['组合', '对象'] },
   background: { category: 'environment', aliases: ['背景', '天空'], capabilities: { ...DEFAULT_CAPABILITIES, delete: false } },
   ground: { category: 'environment', aliases: ['地面', '底部', '草地', '沙滩'], capabilities: { ...DEFAULT_CAPABILITIES, delete: false } },
-  sun: { category: 'environment', aliases: ['太阳', '日头', '落日', '夕阳'] },
+  sun: { category: 'sky', aliases: ['太阳', '日头', '落日', '夕阳'] },
   tree: { category: 'nature', aliases: ['树', '树木', '大树', '小树'] },
-  cloud: { category: 'environment', aliases: ['云', '云朵', '白云', '云彩'] },
+  cloud: { category: 'sky', aliases: ['云', '云朵', '白云', '云彩'] },
   house: { category: 'structure', aliases: ['房子', '小屋', '木屋', '屋子'] },
   flower: { category: 'nature', aliases: ['花', '小花', '鲜花', '花朵'] },
   person: { category: 'person', aliases: ['人', '小人', '人物', '老师'] },
@@ -81,6 +81,7 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
   asset: ['素材', '图案', '图片'],
   group: ['组合', '对象'],
   environment: ['背景', '环境'],
+  sky: ['天空物体', '天上'],
   nature: ['自然', '植物'],
   structure: ['建筑', '结构'],
   person: ['人物', '角色'],
@@ -155,6 +156,9 @@ const inferSpatialSlot = (obj: CanvasContextObject): SpatialSlot | undefined => 
 }
 
 const inferCategory = (obj: CanvasContextObject, base: Partial<ObjectSemanticProfile>) => {
+  if (base.category && !['shape', 'group', 'object'].includes(base.category)) {
+    return base.category
+  }
   if (obj.sceneRole === 'background') return 'background'
   if (obj.sceneRole === 'decoration') return 'decoration'
   if (obj.sceneRole === 'foreground') return 'foreground'

@@ -41,7 +41,9 @@ const SPATIAL_ONLY_MIN_SCORE = 24
 const DEFAULT_MIN_GAP = 12
 
 const hasContextReference = (text: string) =>
-  /它|这个|当前|选中|刚才|最后|上一个/.test(text)
+  /它|这个|刚才|最后|上一个/.test(text)
+  || /当前(对象|图形)?$/.test(text)
+  || /选中(的|对象|图形)?$/.test(text)
 
 const hasTargetActionPrefix = (text: string) =>
   /^(选中|选择|选一下|点一下|点选|删除|删掉|去掉|移除)/.test(text)
@@ -49,12 +51,15 @@ const hasTargetActionPrefix = (text: string) =>
 const explicitlyTargetsEnvironment = (text: string) =>
   /背景|天空|地面|草地|沙滩|海面|道路|路|环境/.test(text)
 
-const isEnvironmentProfile = (profile: ObjectSemanticProfile) =>
-  profile.category === 'background'
-  || profile.category === 'environment'
-  || profile.role === 'background'
-  || profile.kind === 'background'
-  || profile.kind === 'ground'
+const PROTECTED_ENVIRONMENT_KINDS = new Set(['background', 'ground'])
+
+const isProtectedEnvironmentProfile = (profile: ObjectSemanticProfile) =>
+  PROTECTED_ENVIRONMENT_KINDS.has(profile.kind)
+  || (
+    profile.role === 'background'
+    && profile.area >= 800 * 600 * 0.55
+    && ['rect', 'rectangle', 'square'].includes(profile.kind)
+  )
 
 const canProfileHandleAction = (
   profile: ObjectSemanticProfile,
@@ -64,7 +69,7 @@ const canProfileHandleAction = (
   if (!action || action === 'select') return true
 
   const environmentRequested = explicitlyTargetsEnvironment(text)
-  if (!environmentRequested && isEnvironmentProfile(profile)) return false
+  if (!environmentRequested && isProtectedEnvironmentProfile(profile)) return false
 
   if (action === 'move') {
     return profile.capabilities.move && profile.area < 800 * 600 * 0.65
@@ -82,10 +87,10 @@ export const detectSpatialHint = (text: string): TargetQuery['spatial'] => {
   const targetAction = hasTargetActionPrefix(normalized)
 
   if (/最大|最大的|最宽|最大的那个/.test(normalized)) return 'largest'
-  if (/最左|左边的|左侧的|左边那个|左侧那个|左边这个|左侧这个/.test(normalized) || (targetAction && /(左边|左侧)$/.test(normalized))) return 'left'
-  if (/最右|右边的|右侧的|右边那个|右侧那个|右边这个|右侧这个/.test(normalized) || (targetAction && /(右边|右侧)$/.test(normalized))) return 'right'
-  if (/最上|上边的|上面的|顶部的|上边那个|上面那个|顶部那个/.test(normalized) || (targetAction && /(上边|上面|顶部)$/.test(normalized))) return 'top'
-  if (/最下|下边的|下面的|底部的|下边那个|下面那个|底部那个/.test(normalized) || (targetAction && /(下边|下面|底部)$/.test(normalized))) return 'bottom'
+  if (/最左|左边|左侧/.test(normalized) && !/左移|往左|向左/.test(normalized)) return 'left'
+  if (/最右|右边|右侧/.test(normalized) && !/右移|往右|向右/.test(normalized)) return 'right'
+  if (/最上|上边|上面|顶部/.test(normalized) && !/上移|往上|向上/.test(normalized)) return 'top'
+  if (/最下|下边|下面|底部/.test(normalized) && !/下移|往下|向下/.test(normalized)) return 'bottom'
   if (/中间的|中央的|中心的|中间那个|中央那个|中心那个/.test(normalized) || (targetAction && /(中间|中央|中心)$/.test(normalized))) return 'center'
   return undefined
 }
@@ -189,8 +194,9 @@ export const resolveObjectTarget = (
   const text = query.rawText || query.target || ''
   const normalizedText = normalizeQueryText(text)
   const allowContextFallback = options.allowContextFallback ?? true
+  const hasStructuredTarget = Boolean(query.kind || query.label || query.category || query.role || query.spatial)
 
-  if (hasContextReference(normalizedText) || query.target === '__last__') {
+  if ((!hasStructuredTarget && hasContextReference(normalizedText)) || query.target === '__last__') {
     return resolveContextTarget(context)
   }
 
