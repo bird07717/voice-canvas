@@ -2,6 +2,7 @@ from itertools import count
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
+from app.assets.resolver import AssetResolver, SVGAsset
 from app.drawing.schemas import (
     AskClarificationArgs,
     ControlCanvasArgs,
@@ -87,6 +88,7 @@ class DrawingExecutor:
         self._id_counter = count(1)
         self._id_prefix = f"obj_{uuid4().hex[:8]}"
         self.canvas_context = canvas_context or {}
+        self.asset_resolver = AssetResolver()
 
     def execute(self, plan: DrawingPlan) -> Dict[str, Any]:
         commands: List[Dict[str, Any]] = []
@@ -141,6 +143,10 @@ class DrawingExecutor:
 
         if render_strategy == "template" or kind in TEMPLATE_KINDS:
             return [self._create_template(kind, args)]
+
+        asset = self.asset_resolver.resolve(kind, args.description)
+        if asset:
+            return [self._create_svg_asset(args, asset)]
 
         return [self._create_svg_placeholder(args)]
 
@@ -248,6 +254,28 @@ class DrawingExecutor:
                 "fontSize": 20,
                 "fill": "#555555"
             }
+        }
+
+    def _create_svg_asset(self, args: CreateObjectArgs, asset: SVGAsset) -> Dict[str, Any]:
+        x, y = self._resolve_position(args.position)
+        width, height = self._resolve_size(args.size)
+        return {
+            "action": "create",
+            "type": "image",
+            "id": self._next_id(),
+            "params": {
+                "x": x - width / 2,
+                "y": y - height / 2,
+                "width": width,
+                "height": height,
+                "imageUrl": asset.public_url,
+                "kind": asset.kind,
+                "kindLabel": asset.label,
+                "assetId": asset.asset_id,
+                "assetCategory": asset.category,
+                "semanticAliases": asset.aliases,
+                "assetSource": "svg",
+            },
         }
 
     def _edit_object(self, args: EditObjectArgs) -> Optional[Dict[str, Any]]:

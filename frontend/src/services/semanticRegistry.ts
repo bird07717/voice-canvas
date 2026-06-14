@@ -21,6 +21,8 @@ export type ObjectSemanticProfile = {
   spatialSlot?: SpatialSlot
   sceneType?: string
   idHint?: string
+  assetId?: string
+  assetCategory?: string
   area: number
   centerX?: number
   centerY?: number
@@ -92,6 +94,8 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
   prop: ['道具', '物品'],
   food: ['食物'],
   decoration: ['装饰', '点缀'],
+  animal: ['动物'],
+  electronics: ['电子设备', '设备'],
   foreground: ['前景'],
   background: ['背景'],
 }
@@ -159,6 +163,7 @@ const inferCategory = (obj: CanvasContextObject, base: Partial<ObjectSemanticPro
   if (base.category && !['shape', 'group', 'object'].includes(base.category)) {
     return base.category
   }
+  if (obj.assetCategory) return obj.assetCategory
   if (obj.sceneRole === 'background') return 'background'
   if (obj.sceneRole === 'decoration') return 'decoration'
   if (obj.sceneRole === 'foreground') return 'foreground'
@@ -182,8 +187,10 @@ export const buildObjectProfiles = (context: CanvasCommandContext): ObjectSemant
       obj.kindLabel,
       obj.text,
       obj.idHint,
+      obj.assetId,
       kind,
       type,
+      ...(obj.semanticAliases || []),
       ...(base.aliases || []),
       ...(CATEGORY_ALIASES[category] || []),
     ])
@@ -207,6 +214,8 @@ export const buildObjectProfiles = (context: CanvasCommandContext): ObjectSemant
       spatialSlot: inferSpatialSlot(obj),
       sceneType: obj.sceneType,
       idHint: obj.idHint,
+      assetId: obj.assetId,
+      assetCategory: obj.assetCategory,
       area: obj.area ?? Math.max(0, obj.width || 0) * Math.max(0, obj.height || 0),
       centerX: obj.centerX,
       centerY: obj.centerY,

@@ -2,7 +2,7 @@ from itertools import count
 from typing import Any, Dict, Iterable, List, Optional
 from uuid import uuid4
 
-from app.assets.resolver import AssetResolver
+from app.assets.resolver import AssetResolver, SVGAsset
 from app.drawing.executor import DrawingExecutor
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
 from app.scene.patch import ScenePatchOperation, ScenePatchPlan
@@ -84,7 +84,7 @@ class ScenePatchExecutor:
         if render_strategy == "svg":
             asset = self.asset_resolver.resolve(kind, operation.description or operation.label)
             if asset:
-                return [self._create_svg_asset(operation, asset.public_url)]
+                return [self._create_svg_asset(operation, asset)]
             render_strategy = self._default_strategy(kind)
 
         args = CreateObjectArgs(
@@ -115,18 +115,21 @@ class ScenePatchExecutor:
             self._attach_scene_metadata(command, operation, kind)
         return created
 
-    def _create_svg_asset(self, operation: ScenePatchOperation, image_url: str) -> Dict[str, Any]:
+    def _create_svg_asset(self, operation: ScenePatchOperation, asset: SVGAsset) -> Dict[str, Any]:
         x, y = self._position_xy(operation)
         width, height = self._size_wh(operation)
-        kind = (operation.kind or "svg_asset").strip().lower()
+        kind = asset.kind or (operation.kind or "svg_asset").strip().lower()
         params = {
             "x": x - width / 2,
             "y": y - height / 2,
             "width": width,
             "height": height,
-            "imageUrl": image_url,
+            "imageUrl": asset.public_url,
             "kind": kind,
-            "kindLabel": operation.label or operation.kind or "素材",
+            "kindLabel": operation.label or asset.label or operation.kind or "素材",
+            "assetId": asset.asset_id,
+            "assetCategory": asset.category,
+            "semanticAliases": asset.aliases,
             "sceneType": self.scene_type,
             "sceneTitle": self.scene_title,
             "sceneStyle": "cartoon_flat",

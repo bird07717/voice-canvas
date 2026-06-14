@@ -89,6 +89,9 @@ export interface CanvasContextObject {
   sceneType?: string
   sceneRole?: string
   idHint?: string
+  assetId?: string
+  assetCategory?: string
+  semanticAliases?: string[]
 }
 
 export interface CanvasCommandContext {

@@ -825,6 +825,9 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       sceneType: obj.params?.sceneType,
       sceneRole: obj.params?.sceneRole,
       idHint: obj.params?.idHint,
+      assetId: obj.params?.assetId,
+      assetCategory: obj.params?.assetCategory,
+      semanticAliases: Array.isArray(obj.params?.semanticAliases) ? obj.params.semanticAliases : undefined,
     }
   }
 
