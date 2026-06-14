@@ -2,12 +2,15 @@
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 12% 12%, rgba(34, 211, 238, 0.22) 0%, transparent 42%),
-    radial-gradient(ellipse at 88% 18%, rgba(99, 102, 241, 0.18) 0%, transparent 44%),
-    radial-gradient(ellipse at 42% 96%, rgba(20, 184, 166, 0.2) 0%, transparent 46%),
-    linear-gradient(135deg, #f8fbff 0%, #eef6ff 48%, #e6fffb 100%);
+    linear-gradient(115deg, transparent 0 34%, rgba(255, 255, 255, 0.62) 48%, transparent 62%),
+    linear-gradient(70deg, transparent 0 42%, rgba(34, 211, 238, 0.13) 53%, transparent 64%),
+    radial-gradient(ellipse at 12% 12%, rgba(34, 211, 238, 0.2) 0%, transparent 42%),
+    radial-gradient(ellipse at 88% 18%, rgba(99, 102, 241, 0.15) 0%, transparent 44%),
+    radial-gradient(ellipse at 42% 96%, rgba(20, 184, 166, 0.18) 0%, transparent 46%),
+    linear-gradient(135deg, #f8fbff 0%, #eef6ff 48%, #e9fffb 100%);
   background-size: 150% 150%;
   overflow: hidden;
+  animation: homeGradientFlow 22s ease-in-out infinite alternate;
 }
 
 .home-layout::before {
@@ -28,33 +31,73 @@
   position: absolute;
   inset: -20%;
   content: '';
-  opacity: 0.42;
+  opacity: 0.16;
   pointer-events: none;
   background:
-    linear-gradient(115deg, transparent 0 34%, rgba(255, 255, 255, 0.58) 48%, transparent 62%),
-    linear-gradient(70deg, transparent 0 42%, rgba(34, 211, 238, 0.16) 53%, transparent 64%);
+    repeating-linear-gradient(
+      100deg,
+      transparent 0 34px,
+      rgba(37, 99, 235, 0.16) 35px,
+      transparent 36px 70px
+    );
   transform: rotate(-8deg);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 76%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 76%, transparent 100%);
+}
+
+.home-layout > .ant-layout {
+  position: relative;
+  z-index: 1;
+  background: transparent;
 }
 
 .home-header {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 64px;
   padding: 0 28px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.76);
   border-bottom: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08);
-  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.home-logo {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 32%),
+    linear-gradient(135deg, #22d3ee 0%, #4f46e5 50%, #14b8a6 100%);
+  box-shadow:
+    0 12px 26px rgba(20, 184, 166, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.home-logo svg {
+  width: 24px;
+  height: 24px;
 }
 
 .header-left h1 {
   margin: 0;
-  color: #1677ff;
+  color: #0f172a;
   font-size: 24px;
-  font-weight: 780;
+  font-weight: 760;
   line-height: 1;
   text-shadow: none;
 }
@@ -87,21 +130,174 @@
 }
 
 .home-workbench {
+  position: relative;
   width: min(1240px, 100%);
   margin: 0 auto;
   padding: 30px;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.74);
   border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.48));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
   box-shadow:
-    0 26px 80px rgba(37, 99, 235, 0.1),
+    0 30px 90px rgba(37, 99, 235, 0.11),
     inset 0 1px 0 rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.home-workbench::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(37, 99, 235, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+    linear-gradient(120deg, transparent 0 48%, rgba(255, 255, 255, 0.46) 58%, transparent 68%);
+  background-size: 34px 34px, 34px 34px, 100% 100%;
+  opacity: 0.46;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 28%, black 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, black 28%, black 100%);
+}
+
+.home-workbench::after {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  bottom: 26px;
+  width: min(48%, 560px);
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  border: 1px solid rgba(191, 219, 254, 0.34);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(224, 242, 254, 0.18));
+  opacity: 0.46;
+}
+
+.workbench-ambient {
+  position: absolute;
+  top: 72px;
+  right: 44px;
+  z-index: 0;
+  width: min(43%, 500px);
+  height: 280px;
+  pointer-events: none;
+  opacity: 0.78;
+}
+
+.ambient-sketch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ambient-gridline {
+  fill: none;
+  stroke: rgba(37, 99, 235, 0.08);
+  stroke-width: 1.2;
+}
+
+.ambient-wave {
+  fill: none;
+  stroke: rgba(96, 165, 250, 0.26);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 16 18;
+}
+
+.ambient-cloud {
+  fill: rgba(219, 234, 254, 0.3);
+  stroke: rgba(147, 197, 253, 0.34);
+  stroke-width: 3;
+}
+
+.ambient-roof {
+  fill: rgba(248, 113, 113, 0.22);
+  stroke: rgba(252, 165, 165, 0.35);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.ambient-house {
+  fill: rgba(103, 232, 249, 0.2);
+  stroke: rgba(125, 211, 252, 0.34);
+  stroke-width: 3;
+}
+
+.ambient-sun {
+  fill: rgba(250, 204, 21, 0.28);
+  stroke: rgba(253, 224, 71, 0.38);
+  stroke-width: 3;
+}
+
+.ambient-trunk {
+  fill: rgba(180, 83, 9, 0.18);
+}
+
+.ambient-tree {
+  fill: rgba(34, 197, 94, 0.22);
+  stroke: rgba(74, 222, 128, 0.32);
+  stroke-width: 3;
+}
+
+.ambient-tree-light {
+  fill: rgba(74, 222, 128, 0.18);
+}
+
+.ambient-voice {
+  position: absolute;
+  right: 34px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: 0 12px 34px rgba(37, 99, 235, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.ambient-voice span {
+  width: 4px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.74), rgba(79, 70, 229, 0.62));
+  transform-origin: center;
+  animation: ambientVoice 1.9s ease-in-out infinite;
+}
+
+.ambient-voice span:nth-child(2) {
+  height: 22px;
+  animation-delay: 0.14s;
+}
+
+.ambient-voice span:nth-child(3) {
+  height: 28px;
+  animation-delay: 0.28s;
+}
+
+.ambient-voice span:nth-child(4) {
+  height: 18px;
+  animation-delay: 0.42s;
+}
+
+.ambient-voice span:nth-child(5) {
+  height: 24px;
+  animation-delay: 0.56s;
 }
 
 .content-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -136,6 +332,8 @@
 
 .loading-container,
 .empty-workbench {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   min-height: 360px;
@@ -160,9 +358,39 @@
 }
 
 .canvas-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
   gap: 22px;
+}
+
+@keyframes homeGradientFlow {
+  0% {
+    background-position: 0% 40%;
+  }
+
+  100% {
+    background-position: 100% 60%;
+  }
+}
+
+@keyframes ambientVoice {
+  0%,
+  100% {
+    transform: scaleY(0.62);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-layout,
+  .ambient-voice span {
+    animation: none;
+  }
 }
 
 .canvas-card {
@@ -362,6 +590,21 @@
     padding: 0 16px;
   }
 
+  .home-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .home-logo svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .header-left h1 {
+    font-size: 20px;
+  }
+
   .username {
     display: none;
   }
@@ -373,6 +616,11 @@
   .home-workbench {
     padding: 20px;
     border-radius: 20px;
+  }
+
+  .home-workbench::after,
+  .workbench-ambient {
+    display: none;
   }
 
   .content-header {
