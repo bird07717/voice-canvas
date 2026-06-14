@@ -99,6 +99,38 @@ export default function Home() {
     <Layout className="home-layout">
       <Header className="home-header">
         <div className="header-left">
+          <div className="home-logo" aria-hidden="true">
+            <svg viewBox="0 0 64 64" role="img">
+              <path
+                d="M25 13a7 7 0 0 1 14 0v13a7 7 0 0 1-14 0V13Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18 24a14 14 0 0 0 28 0M32 38v7M22 51h20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M39 44 51 32c2.4-2.4 6 1.2 3.6 3.6L42.5 47.7 36 50.5 39 44Z"
+                fill="rgba(255,255,255,0.18)"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M13 45c4.5-5.6 10-5.6 14.5 0s10 5.6 14.5 0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
           <h1>Voice Canvas</h1>
         </div>
         <div className="header-right">
@@ -115,6 +147,15 @@ export default function Home() {
       <Layout>
         <Content className="home-content">
           <div className="home-workbench">
+            <div className="workbench-ambient" aria-hidden="true">
+              <div className="ambient-voice">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
             <div className="content-header">
               <div>
                 <h2>我的画布</h2>
