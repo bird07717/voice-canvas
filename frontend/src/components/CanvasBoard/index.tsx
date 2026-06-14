@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { Stage, Layer, Circle, Rect, Line, Text, Star, Group, Image as KonvaImage } from 'react-konva'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { CanvasObject } from '@/types'
+import { resolveApiUrl } from '@/services/api'
 
 const CANVAS_WIDTH = 800
 const CANVAS_HEIGHT = 600
@@ -11,7 +12,9 @@ function CanvasImage(props: any) {
   const [image, setImage] = useState<HTMLImageElement | null>(null)
 
   useEffect(() => {
-    if (!imageUrl) {
+    const resolvedImageUrl = resolveApiUrl(imageUrl)
+
+    if (!resolvedImageUrl) {
       setImage(null)
       return
     }
@@ -19,8 +22,11 @@ function CanvasImage(props: any) {
     const nextImage = new window.Image()
     nextImage.crossOrigin = 'anonymous'
     nextImage.onload = () => setImage(nextImage)
-    nextImage.onerror = () => setImage(null)
-    nextImage.src = imageUrl
+    nextImage.onerror = () => {
+      console.warn('Canvas image failed to load:', resolvedImageUrl)
+      setImage(null)
+    }
+    nextImage.src = resolvedImageUrl
   }, [imageUrl])
 
   if (!image) {

@@ -325,9 +325,14 @@ arguments: {"reason": "忽略原因"}
         objects = canvas_context.get("objects") or []
         object_lines = []
         for obj in objects[-20:]:
+            aliases = obj.get("semanticAliases") or []
+            alias_text = ",".join(str(alias) for alias in aliases[:6]) if isinstance(aliases, list) else ""
             object_lines.append(
                 f"- id={obj.get('id')}, type={obj.get('type')}, kind={obj.get('kind')}, "
-                f"text={obj.get('text')}, x={obj.get('x')}, y={obj.get('y')}"
+                f"label={obj.get('kindLabel')}, text={obj.get('text')}, "
+                f"assetId={obj.get('assetId')}, assetCategory={obj.get('assetCategory')}, "
+                f"aliases={alias_text}, sceneRole={obj.get('sceneRole')}, "
+                f"x={obj.get('x')}, y={obj.get('y')}"
             )
 
         recent_commands = canvas_context.get("recentCommands") or []

@@ -3,6 +3,8 @@ from math import hypot
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
+from app.assets.resolver import AssetResolver, SVGAsset
+
 
 CANVAS_WIDTH = 800
 CANVAS_HEIGHT = 600
@@ -123,6 +125,10 @@ class ObjectProfile:
     center_y: float
 
 
+_ASSET_RESOLVER = AssetResolver()
+_ASSET_INDEX: Optional[Dict[str, SVGAsset]] = None
+
+
 @dataclass
 class RankedCandidate:
     profile: ObjectProfile
@@ -150,6 +156,47 @@ def unique(items: Iterable[Any]) -> List[str]:
 def normalize_kind(kind: Any) -> str:
     raw = str(kind or "").strip().lower()
     return KIND_ALIASES.get(raw, raw)
+
+
+def asset_lookup_key(value: Any) -> str:
+    return normalize_text(value).replace("_", "")
+
+
+def asset_index() -> Dict[str, SVGAsset]:
+    global _ASSET_INDEX
+    if _ASSET_INDEX is not None:
+        return _ASSET_INDEX
+
+    index: Dict[str, SVGAsset] = {}
+    for asset in _ASSET_RESOLVER.list_assets():
+        terms = [
+            asset.asset_id,
+            asset.kind,
+            asset.label,
+            *asset.aliases,
+            *asset.keywords,
+        ]
+        for term in terms:
+            key = asset_lookup_key(term)
+            if key and key not in index:
+                index[key] = asset
+    _ASSET_INDEX = index
+    return index
+
+
+def find_asset_semantic(obj: Dict[str, Any], kind: str) -> Optional[SVGAsset]:
+    for value in [
+        obj.get("assetId"),
+        kind,
+        obj.get("kind"),
+        obj.get("kindLabel"),
+        obj.get("label"),
+        *list(obj.get("semanticAliases") or []),
+    ]:
+        key = asset_lookup_key(value)
+        if key and key in asset_index():
+            return asset_index()[key]
+    return None
 
 
 def detect_spatial_hint(text: str) -> Optional[str]:
@@ -196,8 +243,11 @@ def best_term_match_score(input_text: Any, terms: Iterable[Any]) -> tuple[float,
 def infer_category(obj: Dict[str, Any], kind: str, type_name: str) -> str:
     base = BASE_KIND_PROFILES.get(kind) or BASE_KIND_PROFILES.get(type_name) or {}
     base_category = base.get("category")
+    asset = find_asset_semantic(obj, kind)
     if obj.get("assetCategory"):
         return str(obj.get("assetCategory"))
+    if asset:
+        return asset.category
     if base_category and base_category not in {"shape", "group", "object"}:
         return str(base_category)
     scene_role = obj.get("sceneRole")
@@ -220,6 +270,7 @@ def build_object_profiles(context: Optional[Dict[str, Any]]) -> List[ObjectProfi
         kind = normalize_kind(obj.get("kind") or obj.get("type") or "object")
         type_name = str(obj.get("type") or "object").lower()
         base = BASE_KIND_PROFILES.get(kind) or BASE_KIND_PROFILES.get(type_name) or {}
+        asset = find_asset_semantic(obj, kind)
         category = infer_category(obj, kind, type_name)
         width = float(obj.get("width") or 0)
         height = float(obj.get("height") or 0)
@@ -238,11 +289,16 @@ def build_object_profiles(context: Optional[Dict[str, Any]]) -> List[ObjectProfi
         area = float(obj.get("area") or max(0, width) * max(0, height))
         aliases = unique([
             obj.get("kindLabel"),
+            asset.label if asset else None,
             obj.get("text"),
             obj.get("idHint"),
             obj.get("assetId"),
+            asset.asset_id if asset else None,
             kind,
             type_name,
+            asset.kind if asset else None,
+            *((asset.aliases if asset else []) or []),
+            *((asset.keywords if asset else []) or []),
             *(obj.get("semanticAliases") or []),
             *(base.get("aliases") or []),
             *CATEGORY_ALIASES.get(category, []),

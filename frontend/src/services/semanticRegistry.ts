@@ -1,4 +1,5 @@
 import { CanvasCommandContext, CanvasContextObject } from '@/types'
+import { findSVGAssetSemantic } from './svgAssetManifest'
 
 export type SpatialSlot = 'left' | 'right' | 'top' | 'bottom' | 'center'
 
@@ -160,7 +161,14 @@ const inferSpatialSlot = (obj: CanvasContextObject): SpatialSlot | undefined => 
 }
 
 const inferCategory = (obj: CanvasContextObject, base: Partial<ObjectSemanticProfile>) => {
+  const assetSemantic = findSVGAssetSemantic({
+    assetId: obj.assetId,
+    kind: obj.kind,
+    label: obj.kindLabel,
+  })
+
   if (obj.assetCategory) return obj.assetCategory
+  if (assetSemantic?.category) return assetSemantic.category
   if (base.category && !['shape', 'group', 'object'].includes(base.category)) {
     return base.category
   }
@@ -181,15 +189,24 @@ export const buildObjectProfiles = (context: CanvasCommandContext): ObjectSemant
     const kind = String(obj.kind || obj.type || 'object').toLowerCase()
     const type = String(obj.type || 'object').toLowerCase()
     const base = BASE_KIND_PROFILES[kind] || BASE_KIND_PROFILES[type] || {}
+    const assetSemantic = findSVGAssetSemantic({
+      assetId: obj.assetId,
+      kind,
+      label: obj.kindLabel,
+    })
     const category = inferCategory(obj, base)
     const colorAliases = inferColorAliases(obj)
     const aliases = unique([
       obj.kindLabel,
+      assetSemantic?.label,
       obj.text,
       obj.idHint,
       obj.assetId,
+      assetSemantic?.assetId,
       kind,
       type,
+      assetSemantic?.kind,
+      ...(assetSemantic?.aliases || []),
       ...(obj.semanticAliases || []),
       ...(base.aliases || []),
       ...(CATEGORY_ALIASES[category] || []),
