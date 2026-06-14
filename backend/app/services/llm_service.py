@@ -7,12 +7,11 @@ from app.drawing.executor import DrawingExecutor
 from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
-from app.scene.intent import is_scene_request
 from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
 from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.planner import ScenePlanner, ScenePlanningError
-from app.scene.templates import build_template_scene_plan
 from app.assets.resolver import AssetResolver
+from app.services.llm_router import classify_llm_route, has_scene_patch_hint
 
 
 class LLMService:
@@ -144,7 +143,13 @@ class LLMService:
 }
 """
 
-    TOOL_PLANNING_PROMPT = """你是语音绘画系统的工具调用规划器。
+    TOOL_PLANNING_PROMPT = """你是语音绘画系统的第三层 LLM 增强工具规划器。
+
+前两层已经处理了：
+- 本地快速命令：撤销、重做、保存、导出、清空、简单几何图形、常见改色/移动/缩放/删除/选择。
+- 固定场景模板：海边日落、公园、生日贺卡、城市夜景、森林小屋、山水风景、教室、温馨客厅、桌面工作区、节日派对。
+
+你只处理前两层无法稳定覆盖的开放对象创建、复杂编辑和模板外补充表达。
 
 用户会用自然中文口语表达绘画需求。你的任务不是直接生成底层Canvas图形，而是选择合适的高层工具调用。
 
@@ -194,7 +199,7 @@ arguments: {"question": "追问内容", "missing": ["缺少的信息"]}
 arguments: {"reason": "忽略原因"}
 
 策略：
-- 常见对象使用 template：sun/tree/cloud/house/flower/person/car/mountain/grass/road/river。
+- 常见对象如果 SVG 素材目录有命中，优先使用 svg；没有命中时再使用 template：sun/tree/cloud/house/flower/person/car/mountain/grass/road/river。
 - 基础图形使用 basic：circle/rectangle/square/line/text/star/polygon。
 - **优先使用SVG资源库中的素材**，当前可用SVG素材涵盖动物、建筑、家具、装饰、电子设备、食物、节日等类别。
 - SVG素材库详情见下方资源目录，使用时 render_strategy 设为 "svg"，kind 使用英文名称。
@@ -376,58 +381,7 @@ arguments: {"reason": "忽略原因"}
         return self._normalize_llm_result(executed)
 
     def _has_scene_patch_hint(self, text: str, scene_title: str, scene_type: str) -> bool:
-        normalized = "".join(str(text or "").split()).lower()
-        title = "".join(scene_title.split()).lower()
-        scene = str(scene_type or "").lower()
-
-        if not normalized:
-            return False
-
-        command_prefixes = ("画一个", "画一幅", "画个", "生成一个", "生成一幅", "来一个", "创建一个")
-        bare_scene_phrases = {
-            title,
-            f"一个{title}",
-            f"一幅{title}",
-            f"画一个{title}",
-            f"画一幅{title}",
-            f"画个{title}",
-            f"生成一个{title}",
-            f"生成一幅{title}",
-            scene,
-        }
-        if normalized in bare_scene_phrases:
-            return False
-
-        patch_words = (
-            "加",
-            "添加",
-            "放",
-            "摆",
-            "带",
-            "有",
-            "不要",
-            "去掉",
-            "删除",
-            "移除",
-            "改",
-            "换",
-            "变",
-            "变成",
-            "旁边",
-            "左边",
-            "右边",
-            "上面",
-            "下面",
-            "文字",
-            "写",
-        )
-        if any(word in normalized for word in patch_words):
-            return True
-
-        for prefix in command_prefixes:
-            if normalized.startswith(prefix + title):
-                return len(normalized) > len(prefix + title)
-        return False
+        return has_scene_patch_hint(text, scene_title, scene_type)
 
     async def _apply_scene_patch_if_needed(
         self,
@@ -561,16 +515,12 @@ arguments: {"reason": "忽略原因"}
     ) -> Dict[str, Any]:
         """处理用户语音命令，调用LLM生成绘图指令"""
 
-        template_scene_plan = build_template_scene_plan(text)
-        if template_scene_plan:
+        decision = classify_llm_route(text, has_llm_config=True)
+        template_scene_plan = decision.template_scene_plan
+        if decision.route in {"template_scene", "template_scene_patch"} and template_scene_plan:
             commands = SceneExecutor(canvas_context).execute(template_scene_plan)
-            needs_patch = self._has_scene_patch_hint(
-                text,
-                template_scene_plan.title,
-                template_scene_plan.scene_type,
-            )
             config = None
-            if needs_patch:
+            if decision.route == "template_scene_patch":
                 if llm_config_id:
                     config = await self.get_config_by_id(llm_config_id)
                 else:
@@ -589,22 +539,38 @@ arguments: {"reason": "忽略原因"}
                 "response": patched["response"],
                 "reason": patched["reason"],
                 "scene": patched["scene"],
+                "llm_route": decision.route,
+                "llm_used": bool(config and decision.route == "template_scene_patch"),
+                "routing_reason": decision.reason,
                 "needs_disambiguation": bool(patched.get("needs_disambiguation")),
                 "disambiguation": patched.get("disambiguation"),
             }
 
-        # 获取LLM配置
         if llm_config_id:
             config = await self.get_config_by_id(llm_config_id)
         else:
             config = await self.get_active_config(user_id)
 
         if not config:
-            raise Exception("No active LLM configuration found")
+            return {
+                "intent": "clarify",
+                "confidence": 0.0,
+                "commands": [],
+                "response": "这个需求需要第三层 LLM 增强理解，请先配置并启用模型。",
+                "reason": "No active LLM configuration found",
+                "llm_route": "requires_llm",
+                "llm_used": False,
+                "routing_reason": decision.reason,
+            }
 
-        if is_scene_request(text):
+        if decision.route == "open_scene":
             try:
-                scene_plan = await ScenePlanner().plan(text, canvas_context, config)
+                scene_plan = await ScenePlanner().plan(
+                    text,
+                    canvas_context,
+                    config,
+                    asset_resolver=self.asset_resolver,
+                )
                 commands = SceneExecutor(canvas_context).execute(scene_plan)
                 return {
                     "intent": "draw",
@@ -612,12 +578,16 @@ arguments: {"reason": "忽略原因"}
                     "commands": commands,
                     "response": scene_plan.response or f"好的，我规划了{scene_plan.title}场景。",
                     "reason": "scene_plan",
+                    "llm_route": "open_scene",
+                    "llm_used": True,
+                    "routing_reason": decision.reason,
                     "scene": {
                         "scene_type": scene_plan.scene_type,
                         "title": scene_plan.title,
                         "style": scene_plan.style,
                         "object_count": len(commands),
                         "layout_notes": scene_plan.layout_notes,
+                        "source": "llm_open_scene",
                     },
                 }
             except ScenePlanningError as e:
@@ -627,6 +597,9 @@ arguments: {"reason": "忽略原因"}
                     "commands": [],
                     "response": e.message,
                     "reason": e.reason,
+                    "llm_route": "open_scene",
+                    "llm_used": True,
+                    "routing_reason": decision.reason,
                 }
             except Exception as e:
                 return {
@@ -635,6 +608,9 @@ arguments: {"reason": "忽略原因"}
                     "commands": [],
                     "response": "我暂时没能完成场景规划，请再说一次或换个简单场景。",
                     "reason": f"Scene Planner failed: {str(e)}",
+                    "llm_route": "open_scene",
+                    "llm_used": True,
+                    "routing_reason": decision.reason,
                 }
 
         # 调用OpenAI API
@@ -667,8 +643,15 @@ arguments: {"reason": "忽略原因"}
             try:
                 result = self._extract_json(content or "")
                 if "calls" in result:
-                    return self._execute_tool_plan(result, canvas_context)
-                return self._normalize_llm_result(result)
+                    normalized = self._execute_tool_plan(result, canvas_context)
+                else:
+                    normalized = self._normalize_llm_result(result)
+                normalized.update({
+                    "llm_route": "tool_plan",
+                    "llm_used": True,
+                    "routing_reason": decision.reason,
+                })
+                return normalized
             except (json.JSONDecodeError, ToolParseError):
                 # 无法解析时默认追问，避免误操作画布
                 return {
@@ -676,7 +659,10 @@ arguments: {"reason": "忽略原因"}
                     "confidence": 0.0,
                     "commands": [],
                     "response": "我没能可靠理解这句话，请再说一次绘画指令。",
-                    "reason": "LLM返回内容不是有效JSON"
+                    "reason": "LLM返回内容不是有效JSON",
+                    "llm_route": "tool_plan",
+                    "llm_used": True,
+                    "routing_reason": decision.reason,
                 }
 
         except Exception as e:

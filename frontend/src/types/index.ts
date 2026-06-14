@@ -124,12 +124,18 @@ export interface VoiceCommandResponse {
   commands: DrawCommand[]
   response: string
   reason?: string
+  llm_route?: 'template_scene' | 'template_scene_patch' | 'open_scene' | 'tool_plan' | 'requires_llm'
+  llm_used?: boolean
+  routing_reason?: string
   scene?: {
     scene_type: string
     title: string
     style: string
     object_count: number
     layout_notes?: string | null
+    source?: string
+    patch_status?: string
+    patch_count?: number
   }
   needs_disambiguation?: boolean
   disambiguation?: {

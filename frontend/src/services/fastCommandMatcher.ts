@@ -35,23 +35,44 @@ const SCENE_REQUEST_PATTERNS = [
   /森林小屋|森林/,
   /山水风景|山水/,
   /教室|课堂/,
-  /场景|一幅|一张/,
+  /温馨客厅|客厅/,
+  /桌面工作区|工作区|书桌|办公桌|学习桌/,
+  /节日派对|派对|节日装饰|生日派对|庆祝场景/,
 ]
 
-export const isLikelySceneRequest = (rawText: string) => {
-  const text = rawText
+const OPEN_SCENE_REQUEST_PATTERNS = [
+  ...SCENE_REQUEST_PATTERNS,
+  /场景|一幅|一张/,
+  /画面|插画|风景|海报|卡片|房间/,
+]
+
+const normalizeSceneRequestText = (rawText: string) =>
+  rawText
     .trim()
     .replace(/[，。！？、,.!?:：\s]/g, '')
     .replace(/^请/, '')
     .replace(/^帮我/, '')
     .replace(/^给我/, '')
 
-  if (!text) return false
-  if (/^(选中|选择|删除|删掉|去掉|撤销|重做|保存|导出|清空)/.test(text)) return false
-  if (/(变大|变小|放大|缩小|左移|右移|上移|下移|往左|往右|往上|往下)/.test(text)) return false
+const hasSceneRequestPrefix = (text: string) =>
+  /^(画|画一个|画个|生成|创建|来一个|来个|做一个|做个)/.test(text)
 
-  return /^(画|画一个|画个|生成|创建|来一个|来个|做一个)/.test(text)
-    && SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+const isBlockedSceneCommand = (text: string) => {
+  if (/^(选中|选择|删除|删掉|去掉|撤销|重做|保存|导出|清空)/.test(text)) return true
+  if (/^(把|将|让|改|换|变|移动|移到|移去|挪到|放到|放在|去掉|移除)/.test(text)) return true
+  return /(变大|变小|放大|缩小|左移|右移|上移|下移|往左|往右|往上|往下)/.test(text)
+}
+
+export const isTemplateSceneRequest = (rawText: string) => {
+  const text = normalizeSceneRequestText(rawText)
+  if (!text || isBlockedSceneCommand(text)) return false
+  return hasSceneRequestPrefix(text) && SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export const isLikelySceneRequest = (rawText: string) => {
+  const text = normalizeSceneRequestText(rawText)
+  if (!text || isBlockedSceneCommand(text)) return false
+  return hasSceneRequestPrefix(text) && OPEN_SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 const normalizeText = (text: string) => {

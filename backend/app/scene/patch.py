@@ -104,7 +104,7 @@ class ScenePatchPlanner:
 规则：
 - 如果用户只是要求画模板本身，没有额外要求，operations 返回 []。
 - 只处理模板以外的额外描述，例如“加一只猫”“把天空变紫”“不要气球”“椅子旁边放喷泉”。
-- add 常见模板对象时 render_strategy=template；基础图形或文字用 basic；素材库里可能存在的具体物体用 svg。
+- add 新增具体物体时优先 render_strategy=svg，并使用 SVG 素材目录里的英文 kind；基础图形、背景块或文字用 basic；只有 SVG 不合适时才用 template。
 - 如果素材库为空或没有匹配项，也可以输出 svg；系统会自动回退为 template/basic 占位。
 - modify/delete 必须带 target。target 优先用 kind 或 label，例如 sky/background/balloon/cake/tree。
 - 每次最多 5 个 operations，避免过度修改模板。
