@@ -127,6 +127,57 @@ SCENE_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "palette": {"wall": "#F8FAFC", "board": "#14532D", "desk": "#D97706"},
         "layout": {"horizon_y": None},
     },
+    "cozy_living_room": {
+        "scene_type": "cozy_living_room",
+        "default_objects": [
+            {"kind": "rect", "role": "background", "position": {"anchor": "custom", "x": 400, "y": 300, "layer": 1}, "size": {"preset": "wide", "width": 800, "height": 600}, "style": {"fill": "#F8FAFC", "stroke": "#F8FAFC"}, "label": "客厅墙面"},
+            {"kind": "rect", "role": "background", "position": {"anchor": "custom", "x": 400, "y": 510, "layer": 2}, "size": {"preset": "wide", "width": 800, "height": 180}, "style": {"fill": "#E2E8F0", "stroke": "#E2E8F0"}, "label": "客厅地面"},
+            {"kind": "window", "role": "midground", "position": {"anchor": "custom", "x": 190, "y": 150, "layer": 3}, "size": {"preset": "medium", "width": 130, "height": 110}, "label": "窗户"},
+            {"kind": "curtain", "role": "decoration", "position": {"anchor": "custom", "x": 190, "y": 150, "layer": 4}, "size": {"preset": "medium", "width": 170, "height": 130}, "label": "窗帘"},
+            {"kind": "picture_frame", "role": "decoration", "position": {"anchor": "custom", "x": 520, "y": 150, "layer": 4}, "size": {"preset": "small", "width": 112, "height": 82}, "label": "相框"},
+            {"kind": "sofa", "role": "foreground", "position": {"anchor": "custom", "x": 400, "y": 360, "layer": 5}, "size": {"preset": "large", "width": 280, "height": 145}, "label": "沙发"},
+            {"kind": "table_coffee", "role": "foreground", "position": {"anchor": "custom", "x": 400, "y": 475, "layer": 6}, "size": {"preset": "medium", "width": 180, "height": 90}, "label": "茶几"},
+            {"kind": "lamp_floor", "role": "foreground", "position": {"anchor": "custom", "x": 625, "y": 330, "layer": 6}, "size": {"preset": "medium", "width": 95, "height": 175}, "label": "落地灯"},
+            {"kind": "plant_potted", "role": "foreground", "position": {"anchor": "custom", "x": 120, "y": 390, "layer": 6}, "size": {"preset": "medium", "width": 92, "height": 130}, "label": "盆栽"},
+            {"kind": "cat", "role": "foreground", "position": {"anchor": "custom", "x": 515, "y": 438, "layer": 7}, "size": {"preset": "small", "width": 72, "height": 62}, "label": "小猫"},
+        ],
+        "palette": {"wall": "#F8FAFC", "floor": "#E2E8F0"},
+        "layout": {"horizon_y": None},
+    },
+    "desk_workspace": {
+        "scene_type": "desk_workspace",
+        "default_objects": [
+            {"kind": "rect", "role": "background", "position": {"anchor": "custom", "x": 400, "y": 300, "layer": 1}, "size": {"preset": "wide", "width": 800, "height": 600}, "style": {"fill": "#EEF2FF", "stroke": "#EEF2FF"}, "label": "工作区背景"},
+            {"kind": "table_desk", "role": "midground", "position": {"anchor": "custom", "x": 400, "y": 420, "layer": 2}, "size": {"preset": "large", "width": 360, "height": 170}, "label": "书桌"},
+            {"kind": "laptop", "role": "foreground", "position": {"anchor": "custom", "x": 380, "y": 330, "layer": 3}, "size": {"preset": "medium", "width": 150, "height": 105}, "label": "笔记本电脑"},
+            {"kind": "lamp_desk", "role": "foreground", "position": {"anchor": "custom", "x": 565, "y": 318, "layer": 3}, "size": {"preset": "medium", "width": 90, "height": 128}, "label": "台灯"},
+            {"kind": "cup_coffee", "role": "foreground", "position": {"anchor": "custom", "x": 250, "y": 350, "layer": 4}, "size": {"preset": "small", "width": 58, "height": 70}, "label": "咖啡杯"},
+            {"kind": "keyboard", "role": "foreground", "position": {"anchor": "custom", "x": 380, "y": 445, "layer": 4}, "size": {"preset": "small", "width": 155, "height": 52}, "label": "键盘"},
+            {"kind": "mouse", "role": "foreground", "position": {"anchor": "custom", "x": 505, "y": 445, "layer": 4}, "size": {"preset": "tiny", "width": 55, "height": 45}, "label": "鼠标"},
+            {"kind": "phone", "role": "foreground", "position": {"anchor": "custom", "x": 610, "y": 425, "layer": 4}, "size": {"preset": "tiny", "width": 45, "height": 72}, "label": "手机"},
+            {"kind": "bookshelf", "role": "midground", "position": {"anchor": "custom", "x": 125, "y": 270, "layer": 2}, "size": {"preset": "large", "width": 130, "height": 230}, "label": "书架"},
+            {"kind": "plant_potted", "role": "foreground", "position": {"anchor": "custom", "x": 680, "y": 390, "layer": 4}, "size": {"preset": "small", "width": 72, "height": 92}, "label": "小盆栽"},
+        ],
+        "palette": {"wall": "#EEF2FF", "desk": "#C4B5FD"},
+        "layout": {"horizon_y": None},
+    },
+    "holiday_party": {
+        "scene_type": "holiday_party",
+        "default_objects": [
+            {"kind": "rect", "role": "background", "position": {"anchor": "custom", "x": 400, "y": 300, "layer": 1}, "size": {"preset": "wide", "width": 800, "height": 600}, "style": {"fill": "#FFF7ED", "stroke": "#FFF7ED"}, "label": "节日背景"},
+            {"kind": "banner", "role": "decoration", "position": {"anchor": "custom", "x": 400, "y": 95, "layer": 2}, "size": {"preset": "wide", "width": 460, "height": 92}, "label": "节日横幅"},
+            {"kind": "streamer", "role": "decoration", "position": {"anchor": "custom", "x": 160, "y": 120, "layer": 3}, "size": {"preset": "small", "width": 120, "height": 80}, "label": "左侧彩带"},
+            {"kind": "streamer", "role": "decoration", "position": {"anchor": "custom", "x": 640, "y": 120, "layer": 3}, "size": {"preset": "small", "width": 120, "height": 80}, "label": "右侧彩带"},
+            {"kind": "lantern_chinese", "role": "decoration", "position": {"anchor": "custom", "x": 235, "y": 205, "layer": 4}, "size": {"preset": "small", "width": 72, "height": 96}, "label": "灯笼"},
+            {"kind": "balloon", "role": "decoration", "position": {"anchor": "custom", "x": 565, "y": 220, "layer": 4}, "size": {"preset": "small", "width": 82, "height": 115}, "label": "气球"},
+            {"kind": "cake", "role": "foreground", "position": {"anchor": "custom", "x": 400, "y": 390, "layer": 5}, "size": {"preset": "medium", "width": 150, "height": 125}, "label": "蛋糕"},
+            {"kind": "gift_box", "role": "foreground", "position": {"anchor": "custom", "x": 270, "y": 455, "layer": 6}, "size": {"preset": "small", "width": 82, "height": 75}, "label": "礼盒"},
+            {"kind": "gift", "role": "foreground", "position": {"anchor": "custom", "x": 525, "y": 455, "layer": 6}, "size": {"preset": "small", "width": 82, "height": 75}, "label": "礼物"},
+            {"kind": "confetti", "role": "decoration", "position": {"anchor": "custom", "x": 400, "y": 260, "layer": 7}, "size": {"preset": "wide", "width": 420, "height": 160}, "label": "彩纸屑"},
+        ],
+        "palette": {"paper": "#FFF7ED", "accent": "#FB7185"},
+        "layout": {"horizon_y": None},
+    },
 }
 
 SCENE_TYPE_ALIASES = {
@@ -142,6 +193,9 @@ SCENE_TYPE_ALIASES = {
     "mountain": "mountain_landscape",
     "landscape": "mountain_landscape",
     "classroom": "simple_classroom",
+    "living_room": "cozy_living_room",
+    "workspace": "desk_workspace",
+    "party": "holiday_party",
 }
 
 SCENE_TEXT_ALIASES = [
@@ -152,6 +206,9 @@ SCENE_TEXT_ALIASES = [
     ("forest_house", ("森林小屋", "森林里的房子", "小木屋")),
     ("mountain_landscape", ("山水风景", "山水", "山景", "山水画")),
     ("simple_classroom", ("教室", "课堂")),
+    ("cozy_living_room", ("客厅", "温馨客厅", "家里客厅", "客厅场景")),
+    ("desk_workspace", ("书桌", "工作区", "办公桌", "桌面工作区", "学习桌")),
+    ("holiday_party", ("节日派对", "派对", "节日装饰", "生日派对", "庆祝场景")),
 ]
 
 SCENE_TITLES = {
@@ -162,6 +219,9 @@ SCENE_TITLES = {
     "forest_house": "森林小屋",
     "mountain_landscape": "山水风景",
     "simple_classroom": "教室",
+    "cozy_living_room": "温馨客厅",
+    "desk_workspace": "桌面工作区",
+    "holiday_party": "节日派对",
 }
 
 
