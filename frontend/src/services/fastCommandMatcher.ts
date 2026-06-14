@@ -1,5 +1,5 @@
 import { CanvasCommandContext, DrawCommand } from '@/types'
-import { hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
+import { ResolveResult, hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
 
 export type FastCommandResult = {
   matched: boolean
@@ -107,11 +107,20 @@ const getShapeColor = (text: string) =>
 
 const findSemanticTarget = (text: string, context: CanvasCommandContext) => {
   if (!hasSemanticTargetHint(text, context)) return null
-  return resolveObjectTarget({ rawText: text }, context).objectId
+  const result = resolveObjectTarget({ rawText: text }, context, { allowContextFallback: false })
+  return result.status === 'resolved' ? result.objectId : null
 }
 
 const resolveSpokenTarget = (text: string, context: CanvasCommandContext) =>
-  resolveObjectTarget({ rawText: text }, context).objectId
+  resolveObjectTarget({ rawText: text }, context)
+
+const getTargetErrorMessage = (result: ResolveResult) => {
+  if (result.status === 'ambiguous') {
+    return '找到多个可能对象，请说清楚位置、名称或先点选目标对象。'
+  }
+
+  return '没有找到要修改的对象，请换一种说法或先点一下对象。'
+}
 
 const commandResult = (
   interpretation: string,
@@ -184,12 +193,13 @@ export function matchFastCommand(
   }
 
   if (/^(删除|删掉|去掉|移除)(它|这个|选中|当前)?$/.test(text) || (/^(删除|删掉|去掉|移除).+/.test(text) && hasSemanticTargetHint(text, context))) {
-    const target = resolveSpokenTarget(text, context)
+    const targetResult = resolveSpokenTarget(text, context)
+    const target = targetResult.objectId
     if (!target) {
       return {
         matched: true,
         interpretation: '删除选中对象',
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -212,14 +222,15 @@ export function matchFastCommand(
     ] as DrawCommand[])
   }
 
-  const target = resolveSpokenTarget(text, context)
+  const targetResult = resolveSpokenTarget(text, context)
+  const target = targetResult.objectId
 
   if (/(变|换|改)(成|为)?(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)/.test(text) || /^(红|红色|蓝|蓝色|绿|绿色|黄|黄色|黑|黑色|白|白色|紫|紫色|粉|粉色|橙|橙色)$/.test(text)) {
     if (!target) {
       return {
         matched: true,
         interpretation: '修改对象颜色',
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -241,7 +252,7 @@ export function matchFastCommand(
       return {
         matched: true,
         interpretation: '放大对象',
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -255,7 +266,7 @@ export function matchFastCommand(
       return {
         matched: true,
         interpretation: '缩小对象',
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -276,7 +287,7 @@ export function matchFastCommand(
       return {
         matched: true,
         interpretation: moveMatch[1],
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -299,7 +310,7 @@ export function matchFastCommand(
       return {
         matched: true,
         interpretation: cornerMatch[1],
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
@@ -320,7 +331,7 @@ export function matchFastCommand(
       return {
         matched: true,
         interpretation: sideMatch[1],
-        errorMessage: '没有可修改的对象，请先选中或创建一个对象。',
+        errorMessage: getTargetErrorMessage(targetResult),
       }
     }
 
