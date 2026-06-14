@@ -112,6 +112,26 @@ SCENE_TYPE_ALIASES = {
     "classroom": "simple_classroom",
 }
 
+SCENE_TEXT_ALIASES = [
+    ("beach_sunset", ("海边日落", "海边", "日落", "沙滩")),
+    ("park", ("公园", "草地公园")),
+    ("birthday_card", ("生日贺卡", "贺卡", "生日卡片")),
+    ("city_night", ("城市夜景", "夜晚城市", "夜景城市")),
+    ("forest_house", ("森林小屋", "森林里的房子", "小木屋")),
+    ("mountain_landscape", ("山水风景", "山水", "山景", "山水画")),
+    ("simple_classroom", ("教室", "课堂")),
+]
+
+SCENE_TITLES = {
+    "beach_sunset": "海边日落",
+    "park": "公园",
+    "birthday_card": "生日贺卡",
+    "city_night": "城市夜景",
+    "forest_house": "森林小屋",
+    "mountain_landscape": "山水风景",
+    "simple_classroom": "教室",
+}
+
 
 def normalize_scene_type(scene_type: str) -> str:
     normalized = str(scene_type or "").strip().lower()
@@ -122,6 +142,33 @@ def get_scene_template(scene_type: str) -> Optional[Dict[str, Any]]:
     normalized = normalize_scene_type(scene_type)
     template = SCENE_TEMPLATES.get(normalized)
     return deepcopy(template) if template else None
+
+
+def match_template_scene_type(text: str) -> Optional[str]:
+    normalized = "".join(str(text or "").split())
+    if not normalized:
+        return None
+
+    for scene_type, aliases in SCENE_TEXT_ALIASES:
+        if any(alias in normalized for alias in aliases):
+            return scene_type
+    return None
+
+
+def build_template_scene_plan(text: str) -> Optional[ScenePlan]:
+    scene_type = match_template_scene_type(text)
+    if not scene_type:
+        return None
+
+    title = SCENE_TITLES.get(scene_type, scene_type)
+    plan = ScenePlan(
+        scene_type=scene_type,
+        title=title,
+        style="cartoon_flat",
+        objects=[],
+        response=f"好的，我用模板快速生成了{title}场景。",
+    )
+    return apply_scene_template(plan)
 
 
 def apply_scene_template(plan: ScenePlan) -> ScenePlan:
@@ -163,6 +210,8 @@ def _extract_extra_objects(
     for obj in planned_objects:
         signature = _object_signature(obj)
         kind = obj.kind.lower()
+        if kind in {"placeholder", "占位", "占位符"}:
+            continue
         if signature in template_signatures:
             continue
         if kind in template_kinds and not obj.description and not obj.id_hint:

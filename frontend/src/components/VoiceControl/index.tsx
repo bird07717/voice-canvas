@@ -6,7 +6,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { matchFastCommand } from '@/services/fastCommandMatcher'
+import { isLikelySceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
 import { CanvasCommandContext, CanvasObject, DrawCommand } from '@/types'
 import './VoiceControl.css'
 
@@ -210,7 +210,8 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       }
     }
 
-    if (!activeConfig) {
+    const canUseTemplateScene = isLikelySceneRequest(text)
+    if (!activeConfig && !canUseTemplateScene) {
       setStatus('error')
       setLastCommandSource(null)
       setInterpretedText('需要 AI 理解的复杂命令')
@@ -288,7 +289,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
 
     for (const [index, command] of commands.entries()) {
       setExecutionMessage(`正在绘制场景：${index + 1} / ${commands.length}`)
-      await wait(120)
+      await wait(60)
       const result = executeCommands([command], { deferHistory: true })
       if (!result.success) {
         return result

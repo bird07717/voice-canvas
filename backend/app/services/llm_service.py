@@ -9,6 +9,7 @@ from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
 from app.scene.intent import is_scene_request
 from app.scene.planner import ScenePlanner, ScenePlanningError
+from app.scene.templates import build_template_scene_plan
 
 
 class LLMService:
@@ -374,6 +375,25 @@ arguments: {"reason": "忽略原因"}
         canvas_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """处理用户语音命令，调用LLM生成绘图指令"""
+
+        template_scene_plan = build_template_scene_plan(text)
+        if template_scene_plan:
+            commands = SceneExecutor(canvas_context).execute(template_scene_plan)
+            return {
+                "intent": "draw",
+                "confidence": 1.0,
+                "commands": commands,
+                "response": template_scene_plan.response,
+                "reason": "scene_template",
+                "scene": {
+                    "scene_type": template_scene_plan.scene_type,
+                    "title": template_scene_plan.title,
+                    "style": template_scene_plan.style,
+                    "object_count": len(commands),
+                    "layout_notes": template_scene_plan.layout_notes,
+                    "source": "template",
+                },
+            }
 
         # 获取LLM配置
         if llm_config_id:

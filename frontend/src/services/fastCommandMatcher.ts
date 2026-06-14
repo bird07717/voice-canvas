@@ -21,6 +21,33 @@ const COLOR_MAP: Array<[RegExp, string, string]> = [
   [/橙色?|橙的/, '#f97316', '橙色'],
 ]
 
+const SCENE_REQUEST_PATTERNS = [
+  /海边日落|海边|日落/,
+  /公园/,
+  /生日贺卡|贺卡/,
+  /城市夜景|夜晚城市|城市/,
+  /森林小屋|森林/,
+  /山水风景|山水/,
+  /教室|课堂/,
+  /场景|一幅|一张/,
+]
+
+export const isLikelySceneRequest = (rawText: string) => {
+  const text = rawText
+    .trim()
+    .replace(/[，。！？、,.!?:：\s]/g, '')
+    .replace(/^请/, '')
+    .replace(/^帮我/, '')
+    .replace(/^给我/, '')
+
+  if (!text) return false
+  if (/^(选中|选择|删除|删掉|去掉|撤销|重做|保存|导出|清空)/.test(text)) return false
+  if (/(变大|变小|放大|缩小|左移|右移|上移|下移|往左|往右|往上|往下)/.test(text)) return false
+
+  return /^(画|画一个|画个|生成|创建|来一个|来个|做一个)/.test(text)
+    && SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+}
+
 const normalizeText = (text: string) => {
   let normalized = text
     .trim()
@@ -30,7 +57,6 @@ const normalizeText = (text: string) => {
     .replace(/^给我/, '')
     .replace(/选种|选重|选钟|泉州|选州|悬中|选衷/g, '选中')
     .replace(/原型|圆新|元形|园形|圆行/g, '圆形')
-    .replace(/元|园|圈/g, '圆')
     .replace(/举型|拒形|矩行|举形/g, '矩形')
     .replace(/蓝瑟|兰色|蓝的/g, '蓝色')
     .replace(/红瑟|洪色|红的/g, '红色')
@@ -192,6 +218,13 @@ export function matchFastCommand(
   rawText: string,
   context: CanvasCommandContext
 ): FastCommandResult {
+  if (isLikelySceneRequest(rawText)) {
+    return {
+      matched: false,
+      message: '场景命令交给 Scene Planner 处理。',
+    }
+  }
+
   const text = normalizeText(rawText)
   if (!text) {
     return {
@@ -378,7 +411,7 @@ export function matchFastCommand(
   const color = getShapeColor(text)
   const shapePrefix = '(画|画个|画一个|换一个|换个|来一个|来个|创建|生成|加一个|加个|弄一个|做一个)'
 
-  if (new RegExp(`^${shapePrefix}.*(圆|圆形)$`).test(text) || /^(画圆|画个圆|来个圆)$/.test(text)) {
+  if (new RegExp(`^${shapePrefix}.*(圆|圆形|圈)$`).test(text) || /^(画圆|画个圆|来个圆|画圈|画个圈|来个圈)$/.test(text)) {
     const label = `${color.label || ''}圆形`
     return commandResult(`创建${label}`, [
       {
