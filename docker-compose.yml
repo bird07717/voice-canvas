@@ -17,6 +17,7 @@ services:
       timeout: 5s
       retries: 5
 
+
   backend:
     build: ./backend
     container_name: voice_canvas_backend
