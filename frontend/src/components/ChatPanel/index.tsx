@@ -69,7 +69,7 @@ export default function ChatPanel() {
       case 'template_scene_patch':
         return commandJson?.llm_used ? '模板 + LLM补丁' : '模板，补丁未启用'
       case 'open_scene':
-        return 'LLM开放场景'
+        return 'LLM SVG整图'
       case 'tool_plan':
         return 'LLM工具规划'
       case 'requires_llm':

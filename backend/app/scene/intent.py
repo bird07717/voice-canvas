@@ -210,6 +210,17 @@ DRAW_PREFIXES = (
     "来个",
     "做一个",
     "做个",
+    "加一个",
+    "加个",
+    "加一只",
+    "加一条",
+    "加一辆",
+    "添加一个",
+    "添加个",
+    "添加一只",
+    "添加一条",
+    "添加一辆",
+    "添加",
 )
 
 
@@ -271,7 +282,7 @@ def is_open_visual_draw_request(text: str) -> bool:
     if any(keyword in normalized for keyword in visual_terms):
         return True
 
-    return False
+    return True
 
 
 def is_open_scene_request(text: str) -> bool:

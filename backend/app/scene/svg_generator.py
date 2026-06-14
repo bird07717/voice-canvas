@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
@@ -38,6 +40,7 @@ class SvgSceneGenerator:
 你只负责把用户的开放式绘画需求，直接写成一整张可渲染的 SVG 画面。
 
 只输出一个完整的 <svg>...</svg>，不要 JSON，不要 Markdown，不要解释。
+第一字符必须是 <，最后一段必须是 </svg>。
 画布固定为 800x600，viewBox 必须是 "0 0 800 600"。
 尽量使用单引号属性值。
 不要使用 script、foreignObject、iframe、image、video、audio、link、style 标签。
@@ -46,6 +49,7 @@ class SvgSceneGenerator:
 
 要求：
 - 画面要完整，有背景、主体、前景和必要装饰。
+- SVG 控制在 80 个图形元素以内，优先使用简洁几何组合，必须完整闭合。
 - 如果用户要求赛博朋克、图书馆、咖啡馆、房间、教室、生日贺卡、海边、森林等，直接围绕该主题创作。
 - 文字要直接写进 SVG 里。
 - 场景要像一整张作品，而不是对象清单。
@@ -76,7 +80,7 @@ class SvgSceneGenerator:
         client = AsyncOpenAI(
             api_key=llm_config.api_key,
             base_url=llm_config.base_url,
-            timeout=75.0,
+            timeout=120.0,
         )
 
         response = await client.chat.completions.create(
@@ -84,15 +88,33 @@ class SvgSceneGenerator:
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "system", "content": self._format_canvas_context(canvas_context)},
-                {"role": "user", "content": text},
+                {"role": "user", "content": self._format_user_prompt(text)},
             ],
-            temperature=0.7,
-            max_tokens=3600,
-            timeout=75.0,
+            temperature=0.35,
+            max_tokens=5000,
+            timeout=120.0,
         )
 
-        content = response.choices[0].message.content or ""
-        return self._sanitize_svg(self._extract_svg(content))
+        choice = response.choices[0]
+        content = self._extract_response_text(choice.message)
+        try:
+            return self._sanitize_svg(self._extract_svg(content))
+        except SvgSceneGeneratorError as exc:
+            finish_reason = getattr(choice, "finish_reason", None)
+            raise SvgSceneGeneratorError(f"{exc}; finish_reason={finish_reason}") from exc
+
+    def _extract_response_text(self, message: Any) -> str:
+        content = str(getattr(message, "content", "") or "").strip()
+        if content:
+            return content
+
+        dumped = message.model_dump() if hasattr(message, "model_dump") else {}
+        for key in ("reasoning_content", "reasoning"):
+            value = dumped.get(key) or getattr(message, key, None)
+            if value:
+                return str(value).strip()
+
+        raise SvgSceneGeneratorError("模型返回空内容")
 
     def fallback(self, text: str, reason: str = "") -> SvgSceneResult:
         scene_type = self._scene_type_from_text(text)
@@ -135,20 +157,53 @@ class SvgSceneGenerator:
 
     def _extract_svg(self, content: str) -> str:
         normalized = str(content or "").strip()
-        if normalized.startswith("```"):
-            lines = normalized.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip().startswith("```"):
-                lines = lines[:-1]
-            normalized = "\n".join(lines).strip()
+        for candidate in self._content_candidates(normalized):
+            svg = self._find_svg_fragment(candidate)
+            if svg:
+                return svg
 
-        start = normalized.find("<svg")
-        end = normalized.rfind("</svg>")
-        if start < 0 or end < 0 or end <= start:
-            raise SvgSceneGeneratorError("模型没有返回完整的 SVG 根节点")
+        snippet = normalized[:240].replace("\n", " ")
+        raise SvgSceneGeneratorError(f"模型没有返回完整的 SVG 根节点，输出摘要: {snippet}")
 
-        return normalized[start:end + len("</svg>")]
+    def _content_candidates(self, content: str) -> list[str]:
+        candidates = []
+
+        try:
+            parsed = json.loads(content)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, str):
+            candidates.append(parsed)
+        elif isinstance(parsed, dict):
+            for key in ("svg", "rawSvg", "content", "result", "data"):
+                value = parsed.get(key)
+                if isinstance(value, str):
+                    candidates.append(value)
+        elif isinstance(parsed, list):
+            candidates.extend(item for item in parsed if isinstance(item, str))
+
+        for match in re.finditer(r"```(?:svg|xml)?\s*([\s\S]*?)```", content, flags=re.IGNORECASE):
+            candidates.append(match.group(1).strip())
+
+        candidates.append(content)
+        candidates.extend(html.unescape(candidate) for candidate in list(candidates))
+        return [candidate.strip() for candidate in candidates if candidate and candidate.strip()]
+
+    def _find_svg_fragment(self, content: str) -> Optional[str]:
+        start_match = re.search(r"<\s*svg(?=[\s>/])", content, flags=re.IGNORECASE)
+        end_matches = list(re.finditer(r"</\s*svg\s*>", content, flags=re.IGNORECASE))
+        if not start_match or not end_matches:
+            return None
+
+        end_match = end_matches[-1]
+        if end_match.end() <= start_match.start():
+            return None
+
+        fragment = content[start_match.start():end_match.end()]
+        if '\\"' in fragment:
+            fragment = fragment.replace('\\"', '"')
+        return fragment
 
     def _sanitize_svg(self, svg: str) -> str:
         try:
@@ -156,14 +211,13 @@ class SvgSceneGenerator:
         except ET.ParseError as exc:
             raise SvgSceneGeneratorError(f"SVG 解析失败: {exc}") from exc
 
-        if self._local_name(root.tag) != "svg":
+        if self._canonical_tag(root.tag) != "svg":
             raise SvgSceneGeneratorError("SVG 根节点不是 <svg>")
 
         clean_root = self._sanitize_node(root)
         if clean_root is None:
             raise SvgSceneGeneratorError("SVG 为空")
 
-        clean_root.set("xmlns", SVG_NS)
         clean_root.set("width", "800")
         clean_root.set("height", "600")
         clean_root.set("viewBox", "0 0 800 600")
@@ -171,7 +225,7 @@ class SvgSceneGenerator:
         return ET.tostring(clean_root, encoding="unicode")
 
     def _sanitize_node(self, node: ET.Element) -> Optional[ET.Element]:
-        tag = self._local_name(node.tag)
+        tag = self._canonical_tag(node.tag)
         sanitized_children = []
         for child in list(node):
             clean_child = self._sanitize_node(child)
@@ -186,7 +240,7 @@ class SvgSceneGenerator:
                 return container
             return None
 
-        clean = ET.Element(node.tag)
+        clean = ET.Element(f"{{{SVG_NS}}}{tag}")
         for attr, value in node.attrib.items():
             sanitized = self._sanitize_attr(tag, attr, value)
             if sanitized is not None:
@@ -323,6 +377,20 @@ class SvgSceneGenerator:
             return tag.split("}", 1)[1]
         return tag
 
+    def _canonical_tag(self, tag: str) -> str:
+        local = self._local_name(tag)
+        aliases = {name.lower(): name for name in self._allowed_tags()}
+        return aliases.get(local.lower(), local)
+
+    def _format_user_prompt(self, text: str) -> str:
+        return "\n".join([
+            f"用户绘画需求：{text}",
+            "请现在直接输出 SVG。",
+            "SVG 要简洁、完整、可解析，不要超过 80 个图形元素。",
+            "不要写“好的”、不要解释、不要代码围栏。",
+            "输出必须从 <svg 开始，以 </svg> 结束。",
+        ])
+
     def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:
         if not canvas_context:
             return "当前画布上下文：无。"
@@ -404,6 +472,17 @@ class SvgSceneGenerator:
             "来个",
             "做一个",
             "做个",
+            "加一个",
+            "加个",
+            "加一只",
+            "加一条",
+            "加一辆",
+            "添加一个",
+            "添加个",
+            "添加一只",
+            "添加一条",
+            "添加一辆",
+            "添加",
             "画",
             "设计一个",
             "设计一幅",

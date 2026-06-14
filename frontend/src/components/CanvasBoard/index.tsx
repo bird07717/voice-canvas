@@ -20,7 +20,9 @@ function CanvasImage(props: any) {
     }
 
     const nextImage = new window.Image()
-    nextImage.crossOrigin = 'anonymous'
+    if (!/^(data|blob):/i.test(resolvedImageUrl)) {
+      nextImage.crossOrigin = 'anonymous'
+    }
     nextImage.onload = () => setImage(nextImage)
     nextImage.onerror = () => {
       console.warn('Canvas image failed to load:', resolvedImageUrl)
