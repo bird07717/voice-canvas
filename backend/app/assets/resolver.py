@@ -13,6 +13,8 @@ PROJECT_ROOT = BACKEND_ROOT.parent
 # SVG资源统一存放在前端public目录，便于管理
 DEFAULT_ASSET_ROOTS = [
     PROJECT_ROOT / "frontend" / "public" / "svg-assets",
+    PROJECT_ROOT / "svg_assets",
+    Path("/svg-assets"),
 ]
 
 KIND_ALIASES: Dict[str, List[str]] = {
@@ -99,6 +101,7 @@ class AssetResolver:
 
     def list_assets(self) -> List[SVGAsset]:
         assets: List[SVGAsset] = []
+        seen_asset_ids = set()
         for root in self.roots:
             if not root.exists():
                 continue
@@ -107,6 +110,9 @@ class AssetResolver:
                 if not file_path.is_file():
                     continue
                 asset_id = file_path.relative_to(root).with_suffix("").as_posix()
+                if asset_id in seen_asset_ids:
+                    continue
+                seen_asset_ids.add(asset_id)
                 metadata = manifest.get(asset_id, {})
                 stem_tokens = _tokens(file_path.stem)
                 folder_tokens = _tokens(file_path.parent.relative_to(root).as_posix())
@@ -139,19 +145,20 @@ class AssetResolver:
                 )
         return assets
 
-    def catalog_summary(self, limit: int = 80) -> str:
+    def catalog_summary(self, limit: Optional[int] = None) -> str:
         assets = self.list_assets()
         if not assets:
             return "当前 SVG 素材库为空；新增未知物体时应回退到 template 或 basic 几何。"
 
         lines = []
-        for asset in assets[:limit]:
+        selected_assets = assets[:limit] if limit is not None else assets
+        for asset in selected_assets:
             aliases = ",".join(asset.aliases[:6])
             lines.append(
                 f"- {asset.asset_id}: kind={asset.kind}; label={asset.label}; "
                 f"category={asset.category}; aliases={aliases}; keywords={','.join(asset.keywords[:8])}"
             )
-        if len(assets) > limit:
+        if limit is not None and len(assets) > limit:
             lines.append(f"- 还有 {len(assets) - limit} 个素材未列出。")
         return "\n".join(lines)
 

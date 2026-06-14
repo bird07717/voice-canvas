@@ -24,10 +24,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://admin:postgres123@postgres:5432/voice_canvas
       SECRET_KEY: your-secret-key-change-in-production
       CORS_ORIGINS: '["http://localhost:3000"]'
+      SVG_ASSET_ROOTS: /svg-assets
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./frontend/public/svg-assets:/svg-assets:ro
     depends_on:
       postgres:
         condition: service_healthy
