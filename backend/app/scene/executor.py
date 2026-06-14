@@ -171,13 +171,16 @@ class SceneExecutor:
 
     def _create_scene_object(self, scene_object: SceneObject, plan: ScenePlan) -> List[Dict[str, Any]]:
         kind = self._normalize_kind(scene_object.kind)
-        render_strategy = "basic" if kind in BASIC_KINDS else "template"
-        if kind not in BASIC_KINDS and kind not in SUPPORTED_TEMPLATE_KINDS:
+        render_strategy = scene_object.render_strategy or ("basic" if kind in BASIC_KINDS else "svg")
+        if render_strategy != "basic" and kind not in BASIC_KINDS:
             asset = self.asset_resolver.resolve(kind, scene_object.description or scene_object.label)
             if asset:
                 return [self._create_svg_scene_object(scene_object, plan, asset)]
+        if kind not in BASIC_KINDS and kind not in SUPPORTED_TEMPLATE_KINDS:
             kind = "text"
             render_strategy = "basic"
+        elif render_strategy == "svg":
+            render_strategy = "template"
 
         args = CreateObjectArgs(
             kind=kind,
@@ -256,6 +259,7 @@ class SceneExecutor:
             stroke=scene_object.style.stroke,
             opacity=scene_object.style.opacity,
             text=text,
+            font_size=scene_object.style.font_size,
         )
 
     def _resolve_position(self, scene_object: SceneObject) -> Tuple[float, float]:

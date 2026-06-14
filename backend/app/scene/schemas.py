@@ -17,6 +17,7 @@ SceneAnchor = Literal[
     "custom"
 ]
 SceneSizePreset = Literal["tiny", "small", "medium", "large", "huge", "wide", "tall"]
+SceneRenderStrategy = Literal["basic", "template", "svg"]
 
 
 class SceneBackground(BaseModel):
@@ -43,11 +44,13 @@ class SceneStyle(BaseModel):
     stroke: Optional[str] = None
     opacity: Optional[float] = Field(default=None, ge=0, le=1)
     text: Optional[str] = None
+    font_size: Optional[float] = Field(default=None, gt=0)
 
 
 class SceneObject(BaseModel):
     id_hint: Optional[str] = None
     kind: str = Field(..., min_length=1)
+    render_strategy: Optional[SceneRenderStrategy] = None
     role: SceneRole = "midground"
     position: ScenePosition = Field(default_factory=ScenePosition)
     size: SceneSize = Field(default_factory=SceneSize)
