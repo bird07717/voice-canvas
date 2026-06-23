@@ -68,6 +68,87 @@ class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["commands"][0]["params"]["imageUrl"].startswith("data:image/svg+xml;base64,"))
         self.assertIn("rawSvg", result["commands"][0]["params"])
 
+    async def test_tool_plan_empty_commands_does_not_fallback_to_svg_scene(self):
+        service = LLMService()
+        service.get_active_config = AsyncMock(
+            return_value=type(
+                "Config",
+                (),
+                {
+                    "api_key": "test",
+                    "base_url": "http://example.invalid",
+                    "model_name": "test-model",
+                },
+            )()
+        )
+
+        content = """
+        {
+          "calls": [
+            {
+              "tool": "create_object",
+              "confidence": 0.9,
+              "arguments": {
+                "kind": "unknown_widget",
+                "render_strategy": "svg",
+                "position": {"anchor": "center"},
+                "size": {"preset": "medium"},
+                "style": {},
+                "description": "一个不存在于本地素材库的对象"
+              }
+            }
+          ],
+          "response": "好的。",
+          "reasoning": "测试不可执行创建计划"
+        }
+        """
+        fake_response = type(
+            "Response",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {"message": type("Message", (), {"content": content})()},
+                    )()
+                ]
+            },
+        )()
+        fake_create = AsyncMock(return_value=fake_response)
+        fake_client = type(
+            "Client",
+            (),
+            {
+                "chat": type(
+                    "Chat",
+                    (),
+                    {
+                        "completions": type(
+                            "Completions",
+                            (),
+                            {"create": fake_create},
+                        )()
+                    },
+                )()
+            },
+        )()
+
+        with (
+            patch("app.services.llm_service.AsyncOpenAI", return_value=fake_client),
+            patch("app.services.llm_service.SvgSceneGenerator.generate", AsyncMock()) as svg_generate,
+        ):
+            result = await service.process_command(
+                user_id=1,
+                text="把天空变紫",
+                canvas_context={},
+            )
+
+        self.assertEqual(result["intent"], "clarify")
+        self.assertEqual(result["llm_route"], "tool_plan")
+        self.assertEqual(result["commands"], [])
+        svg_generate.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
+SVG_GENERATION_TIMEOUT_SECONDS = 30.0
+SVG_MAX_TOKENS = 2600
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,8 @@ class SvgSceneGenerator:
 
 要求：
 - 画面要完整，有背景、主体、前景和必要装饰。
-- SVG 控制在 80 个图形元素以内，优先使用简洁几何组合，必须完整闭合。
+- SVG 控制在 40 个图形元素以内，优先使用简洁几何组合，必须完整闭合。
+- 优先生成稳定、短小、可解析的 SVG，不要追求复杂细节。
 - 如果用户要求赛博朋克、图书馆、咖啡馆、房间、教室、生日贺卡、海边、森林等，直接围绕该主题创作。
 - 文字要直接写进 SVG 里。
 - 场景要像一整张作品，而不是对象清单。
@@ -63,9 +67,13 @@ class SvgSceneGenerator:
         text: str,
         canvas_context: Optional[Dict[str, Any]],
         llm_config: LLMConfig,
+        timeout_seconds: float = SVG_GENERATION_TIMEOUT_SECONDS,
     ) -> SvgSceneResult:
         try:
-            svg = await self._generate_svg(text, canvas_context, llm_config)
+            svg = await asyncio.wait_for(
+                self._generate_svg(text, canvas_context, llm_config, timeout_seconds),
+                timeout=timeout_seconds + 5.0,
+            )
             return self._build_result(text, svg, source="llm_svg_scene")
         except Exception as exc:
             logger.warning("SVG scene generation failed, using fallback: %s", exc)
@@ -76,11 +84,12 @@ class SvgSceneGenerator:
         text: str,
         canvas_context: Optional[Dict[str, Any]],
         llm_config: LLMConfig,
+        timeout_seconds: float,
     ) -> str:
         client = AsyncOpenAI(
             api_key=llm_config.api_key,
             base_url=llm_config.base_url,
-            timeout=120.0,
+            timeout=timeout_seconds,
         )
 
         response = await client.chat.completions.create(
@@ -91,8 +100,8 @@ class SvgSceneGenerator:
                 {"role": "user", "content": self._format_user_prompt(text)},
             ],
             temperature=0.35,
-            max_tokens=5000,
-            timeout=120.0,
+            max_tokens=SVG_MAX_TOKENS,
+            timeout=timeout_seconds,
         )
 
         choice = response.choices[0]
@@ -386,7 +395,8 @@ class SvgSceneGenerator:
         return "\n".join([
             f"用户绘画需求：{text}",
             "请现在直接输出 SVG。",
-            "SVG 要简洁、完整、可解析，不要超过 80 个图形元素。",
+            "SVG 要简洁、完整、可解析，不要超过 40 个图形元素。",
+            "尽量控制在 2600 tokens 以内。",
             "不要写“好的”、不要解释、不要代码围栏。",
             "输出必须从 <svg 开始，以 </svg> 结束。",
         ])

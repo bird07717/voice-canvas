@@ -5,15 +5,20 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.drawing.executor import DrawingExecutor
-from app.drawing.schemas import CreateObjectArgs, DrawingPlan
+from app.drawing.object_request import SimpleObjectMatch, build_simple_object_request_from_match
 from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
 from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
 from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.svg_generator import SvgSceneGenerator
+from app.scene.templates import build_template_scene_plan_by_type
 from app.assets.resolver import AssetResolver
 from app.services.llm_router import classify_llm_route, has_scene_patch_hint
+
+
+TOOL_PLANNING_TIMEOUT_SECONDS = 20.0
+TOOL_PLANNING_MAX_TOKENS = 1200
 
 
 class LLMService:
@@ -382,16 +387,19 @@ arguments: {"reason": "忽略原因"}
         executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
-    def _tool_plan_needs_svg_fallback(
-        self,
-        plan: DrawingPlan,
-        normalized: Dict[str, Any],
-    ) -> bool:
-        if normalized.get("commands"):
-            return False
-        if normalized.get("intent") not in {"draw", "clarify"}:
-            return False
-        return any(isinstance(call.arguments, CreateObjectArgs) for call in plan.calls)
+    def _object_match_from_decision(self, decision: Any) -> Optional[SimpleObjectMatch]:
+        if not (
+            decision.matched_object_kind
+            and decision.matched_object_label
+            and decision.matched_object_source
+        ):
+            return None
+        return SimpleObjectMatch(
+            kind=decision.matched_object_kind,
+            source=decision.matched_object_source,
+            label=decision.matched_object_label,
+            asset_id=decision.matched_asset_id,
+        )
 
     def _execute_svg_scene_response(
         self,
@@ -589,8 +597,24 @@ arguments: {"reason": "忽略原因"}
         """处理用户语音命令，调用LLM生成绘图指令"""
 
         decision = classify_llm_route(text, has_llm_config=True)
-        template_scene_plan = decision.template_scene_plan
-        if decision.route in {"template_scene", "template_scene_patch"} and template_scene_plan:
+        if decision.route in {"template_scene", "template_scene_patch"}:
+            template_scene_plan = (
+                build_template_scene_plan_by_type(decision.matched_scene_type)
+                if decision.matched_scene_type
+                else None
+            )
+            if not template_scene_plan:
+                return {
+                    "intent": "clarify",
+                    "confidence": 0.0,
+                    "commands": [],
+                    "response": "我找到了场景模板线索，但没能生成稳定的本地场景。",
+                    "reason": "Template scene route did not include a valid scene type",
+                    "llm_route": decision.route,
+                    "llm_used": False,
+                    "routing_reason": decision.reason,
+                }
+
             commands = SceneExecutor(canvas_context).execute(template_scene_plan)
             config = None
             if decision.route == "template_scene_patch":
@@ -619,9 +643,34 @@ arguments: {"reason": "忽略原因"}
                 "disambiguation": patched.get("disambiguation"),
             }
 
-        if decision.route == "local_object" and decision.simple_object_request:
-            object_request = decision.simple_object_request
-            commands = DrawingExecutor(canvas_context)._create_object(object_request.args)
+        if decision.route == "local_object":
+            object_match = self._object_match_from_decision(decision)
+            object_request = (
+                build_simple_object_request_from_match(
+                    text,
+                    object_match,
+                    self.asset_resolver,
+                )
+                if object_match
+                else None
+            )
+            if not object_request:
+                return {
+                    "intent": "clarify",
+                    "confidence": 0.0,
+                    "commands": [],
+                    "response": "我识别到了本地对象，但没能生成可靠的绘图参数。",
+                    "reason": "Local object route did not include a rebuildable object match",
+                    "llm_route": "local_object",
+                    "llm_used": False,
+                    "routing_reason": decision.reason,
+                }
+
+            executor = DrawingExecutor(canvas_context)
+            if object_request.source == "svg_asset" and object_request.asset:
+                commands = [executor._create_svg_asset(object_request.args, object_request.asset)]
+            else:
+                commands = executor._create_object(object_request.args)
             return {
                 "intent": "draw",
                 "confidence": 1.0,
@@ -668,7 +717,7 @@ arguments: {"reason": "忽略原因"}
         client = AsyncOpenAI(
             api_key=config.api_key,
             base_url=config.base_url,
-            timeout=60.0  # 设置60秒超时
+            timeout=TOOL_PLANNING_TIMEOUT_SECONDS,
         )
 
         try:
@@ -684,8 +733,8 @@ arguments: {"reason": "忽略原因"}
                     {"role": "user", "content": text}
                 ],
                 temperature=0.7,
-                max_tokens=2000,
-                timeout=60.0  # 设置60秒超时
+                max_tokens=TOOL_PLANNING_MAX_TOKENS,
+                timeout=TOOL_PLANNING_TIMEOUT_SECONDS,
             )
 
             content = response.choices[0].message.content
@@ -697,16 +746,17 @@ arguments: {"reason": "忽略原因"}
                     plan = parse_drawing_plan(result)
                     executed = DrawingExecutor(canvas_context).execute(plan)
                     normalized = self._normalize_llm_result(executed)
-                    if self._tool_plan_needs_svg_fallback(plan, normalized):
-                        svg_scene = await SvgSceneGenerator().generate(
-                            text=text,
-                            canvas_context=canvas_context,
-                            llm_config=config,
-                        )
-                        return self._execute_svg_scene_response(
-                            svg_scene,
-                            "LLM 工具规划没有生成可执行创建命令，回退到 SVG 场景生成",
-                        )
+                    if not normalized.get("commands"):
+                        return {
+                            "intent": "clarify",
+                            "confidence": 0.0,
+                            "commands": [],
+                            "response": "我没能生成可靠的可执行绘图步骤，请换一种更具体的说法。",
+                            "reason": "LLM tool plan produced no executable commands",
+                            "llm_route": "tool_plan",
+                            "llm_used": True,
+                            "routing_reason": decision.reason,
+                        }
                 else:
                     normalized = self._normalize_llm_result(result)
                 normalized.update({

@@ -100,10 +100,31 @@ def _fallback_kind(asset_id: str) -> str:
 
 
 class AssetResolver:
+    _assets_cache: Optional[List[SVGAsset]] = None
+    _cache_roots_key: Optional[tuple[str, ...]] = None
+
     def __init__(self, roots: Optional[Iterable[Path]] = None):
         self.roots = [Path(root) for root in (roots or _configured_roots())]
 
+    @classmethod
+    def clear_cache(cls) -> None:
+        cls._assets_cache = None
+        cls._cache_roots_key = None
+
     def list_assets(self) -> List[SVGAsset]:
+        roots_key = tuple(str(root.resolve()) for root in self.roots if root.exists())
+        if (
+            self.__class__._assets_cache is not None
+            and self.__class__._cache_roots_key == roots_key
+        ):
+            return self.__class__._assets_cache
+
+        assets = self._scan_assets()
+        self.__class__._assets_cache = assets
+        self.__class__._cache_roots_key = roots_key
+        return assets
+
+    def _scan_assets(self) -> List[SVGAsset]:
         assets: List[SVGAsset] = []
         seen_asset_ids = set()
         for root in self.roots:

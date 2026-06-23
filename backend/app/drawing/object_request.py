@@ -209,6 +209,14 @@ class SimpleObjectRequest:
     asset: Optional[SVGAsset] = None
 
 
+@dataclass(frozen=True)
+class SimpleObjectMatch:
+    kind: str
+    source: str
+    label: str
+    asset_id: Optional[str] = None
+
+
 def normalize_spoken_text(text: str) -> str:
     return re.sub(r"[\s，。！？、,.!?:：]+", "", str(text or "")).lower()
 
@@ -363,6 +371,16 @@ def build_simple_object_request(
     text: str,
     asset_resolver: Optional[AssetResolver] = None,
 ) -> Optional[SimpleObjectRequest]:
+    match = match_simple_object(text, asset_resolver)
+    if not match:
+        return None
+    return build_simple_object_request_from_match(text, match, asset_resolver)
+
+
+def match_simple_object(
+    text: str,
+    asset_resolver: Optional[AssetResolver] = None,
+) -> Optional[SimpleObjectMatch]:
     if not is_simple_object_text(text):
         return None
 
@@ -374,6 +392,35 @@ def build_simple_object_request(
     template_kind = resolve_template_kind(text)
 
     if asset:
+        return SimpleObjectMatch(
+            kind=asset.kind,
+            source="svg_asset",
+            label=asset.label,
+            asset_id=asset.asset_id,
+        )
+
+    if template_kind:
+        return SimpleObjectMatch(
+            kind=template_kind,
+            source="template_object",
+            label=phrase or template_kind,
+        )
+
+    return None
+
+
+def build_simple_object_request_from_match(
+    text: str,
+    match: SimpleObjectMatch,
+    asset_resolver: Optional[AssetResolver] = None,
+) -> Optional[SimpleObjectRequest]:
+    phrase = extract_object_phrase(text)
+
+    if match.source == "svg_asset":
+        resolver = asset_resolver or AssetResolver()
+        asset = _asset_from_match(resolver, match)
+        if not asset:
+            return None
         return SimpleObjectRequest(
             args=CreateObjectArgs(
                 kind=asset.kind,
@@ -388,18 +435,30 @@ def build_simple_object_request(
             asset=asset,
         )
 
-    if template_kind:
+    if match.source == "template_object" and match.kind in TEMPLATE_KINDS:
         return SimpleObjectRequest(
             args=CreateObjectArgs(
-                kind=template_kind,
+                kind=match.kind,
                 render_strategy="template",
                 position=position_from_text(text),
                 size=size_from_text(text),
                 style=style_from_text(text),
-                description=phrase or template_kind,
+                description=phrase or match.kind,
             ),
             source="template_object",
-            label=phrase or template_kind,
+            label=match.label or phrase or match.kind,
         )
 
     return None
+
+
+def _asset_from_match(
+    resolver: AssetResolver,
+    match: SimpleObjectMatch,
+) -> Optional[SVGAsset]:
+    if match.asset_id:
+        for asset in resolver.list_assets():
+            if asset.asset_id == match.asset_id:
+                return asset
+
+    return resolver.resolve(match.kind, match.label) or resolver.resolve_text(match.label)

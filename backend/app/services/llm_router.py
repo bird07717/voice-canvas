@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from app.drawing.object_request import SimpleObjectRequest, build_simple_object_request
+from app.assets.resolver import AssetResolver
+from app.drawing.object_request import match_simple_object
 from app.scene.intent import is_open_visual_draw_request
-from app.scene.schemas import ScenePlan
-from app.scene.templates import build_template_scene_plan
+from app.scene.templates import get_scene_title, match_template_scene_type
 
 
 LLMRoute = Literal[
@@ -22,8 +22,12 @@ class LLMRouteDecision:
     route: LLMRoute
     requires_llm: bool
     reason: str
-    template_scene_plan: Optional[ScenePlan] = None
-    simple_object_request: Optional[SimpleObjectRequest] = None
+    matched_scene_type: Optional[str] = None
+    matched_scene_title: Optional[str] = None
+    matched_object_kind: Optional[str] = None
+    matched_object_label: Optional[str] = None
+    matched_object_source: Optional[str] = None
+    matched_asset_id: Optional[str] = None
 
 
 def has_scene_patch_hint(text: str, scene_title: str, scene_type: str) -> bool:
@@ -84,12 +88,13 @@ def has_scene_patch_hint(text: str, scene_title: str, scene_type: str) -> bool:
 
 
 def classify_llm_route(text: str, has_llm_config: bool = True) -> LLMRouteDecision:
-    template_scene_plan = build_template_scene_plan(text)
-    if template_scene_plan:
+    scene_type = match_template_scene_type(text)
+    if scene_type:
+        scene_title = get_scene_title(scene_type)
         needs_patch = has_scene_patch_hint(
             text,
-            template_scene_plan.title,
-            template_scene_plan.scene_type,
+            scene_title,
+            scene_type,
         )
         if needs_patch:
             return LLMRouteDecision(
@@ -100,27 +105,32 @@ def classify_llm_route(text: str, has_llm_config: bool = True) -> LLMRouteDecisi
                     if has_llm_config
                     else "固定模板命中，但未配置 LLM，跳过附加描述"
                 ),
-                template_scene_plan=template_scene_plan,
+                matched_scene_type=scene_type,
+                matched_scene_title=scene_title,
             )
 
         return LLMRouteDecision(
             route="template_scene",
             requires_llm=False,
             reason="固定模板命中，本地生成稳定场景",
-            template_scene_plan=template_scene_plan,
+            matched_scene_type=scene_type,
+            matched_scene_title=scene_title,
         )
 
-    simple_object_request = build_simple_object_request(text)
-    if simple_object_request:
+    object_match = match_simple_object(text, AssetResolver())
+    if object_match:
         return LLMRouteDecision(
             route="local_object",
             requires_llm=False,
             reason=(
                 "命中本地 SVG 素材，直接生成对象"
-                if simple_object_request.source == "svg_asset"
+                if object_match.source == "svg_asset"
                 else "命中本地模板对象，直接生成对象"
             ),
-            simple_object_request=simple_object_request,
+            matched_object_kind=object_match.kind,
+            matched_object_label=object_match.label,
+            matched_object_source=object_match.source,
+            matched_asset_id=object_match.asset_id,
         )
 
     if is_open_visual_draw_request(text):
