@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from app.services.llm_service import LLMService
+from app.services.llm_client import LLMTextResponse
 
 
 class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
@@ -102,40 +103,8 @@ class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
           "reasoning": "测试不可执行创建计划"
         }
         """
-        fake_response = type(
-            "Response",
-            (),
-            {
-                "choices": [
-                    type(
-                        "Choice",
-                        (),
-                        {"message": type("Message", (), {"content": content})()},
-                    )()
-                ]
-            },
-        )()
-        fake_create = AsyncMock(return_value=fake_response)
-        fake_client = type(
-            "Client",
-            (),
-            {
-                "chat": type(
-                    "Chat",
-                    (),
-                    {
-                        "completions": type(
-                            "Completions",
-                            (),
-                            {"create": fake_create},
-                        )()
-                    },
-                )()
-            },
-        )()
-
         with (
-            patch("app.services.llm_service.AsyncOpenAI", return_value=fake_client),
+            patch("app.services.llm_service.complete_text", AsyncMock(return_value=LLMTextResponse(content=content))),
             patch("app.services.llm_service.SvgSceneGenerator.generate", AsyncMock()) as svg_generate,
         ):
             result = await service.process_command(

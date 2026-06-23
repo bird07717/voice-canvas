@@ -1,7 +1,6 @@
 import json
 import hashlib
 from typing import Optional, List, Dict, Any
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.drawing.executor import DrawingExecutor
@@ -14,6 +13,7 @@ from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.svg_generator import SvgSceneGenerator
 from app.scene.templates import build_template_scene_plan_by_type
 from app.assets.resolver import AssetResolver
+from app.services.llm_client import complete_text, complete_text_with_config
 from app.services.llm_router import classify_llm_route, has_scene_patch_hint
 
 
@@ -446,12 +446,16 @@ arguments: {"reason": "忽略原因"}
                 "object_count": len(commands),
                 "layout_notes": svg_scene.layout_notes,
                 "source": svg_scene.source,
+                "repaired": bool(getattr(svg_scene, "repaired", False)),
+                "fallback_reason": getattr(svg_scene, "fallback_reason", None),
             },
             "svg_scene": {
                 "scene_type": svg_scene.scene_type,
                 "title": svg_scene.title,
                 "source": svg_scene.source,
                 "svg": svg_scene.svg,
+                "repaired": bool(getattr(svg_scene, "repaired", False)),
+                "fallback_reason": getattr(svg_scene, "fallback_reason", None),
             },
         }
 
@@ -713,20 +717,13 @@ arguments: {"reason": "忽略原因"}
             )
             return self._execute_svg_scene_response(svg_scene, decision.reason)
 
-        # 调用OpenAI API
-        client = AsyncOpenAI(
-            api_key=config.api_key,
-            base_url=config.base_url,
-            timeout=TOOL_PLANNING_TIMEOUT_SECONDS,
-        )
-
         try:
             # 构建系统消息，包含SVG资源目录
             svg_catalog = self._get_svg_assets_catalog()
             system_message = self.TOOL_PLANNING_PROMPT + svg_catalog
 
-            response = await client.chat.completions.create(
-                model=config.model_name,
+            response = await complete_text(
+                config,
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "system", "content": self._format_canvas_context(canvas_context)},
@@ -737,7 +734,7 @@ arguments: {"reason": "忽略原因"}
                 timeout=TOOL_PLANNING_TIMEOUT_SECONDS,
             )
 
-            content = response.choices[0].message.content
+            content = response.content
 
             # 解析并规范化JSON响应
             try:
@@ -792,20 +789,18 @@ arguments: {"reason": "忽略原因"}
 
     async def test_connection(
         self,
+        api_format: str,
         base_url: str,
         api_key: str,
         model_name: str
     ) -> tuple[bool, str]:
         """测试LLM连接"""
         try:
-            client = AsyncOpenAI(
-                api_key=api_key,
+            response = await complete_text_with_config(
+                api_format=api_format,
                 base_url=base_url,
-                timeout=30.0  # 测试连接使用30秒超时
-            )
-
-            response = await client.chat.completions.create(
-                model=model_name,
+                api_key=api_key,
+                model_name=model_name,
                 messages=[
                     {"role": "user", "content": "Reply with exactly: OK"}
                 ],
@@ -814,11 +809,11 @@ arguments: {"reason": "忽略原因"}
                 timeout=30.0  # 测试连接使用30秒超时
             )
 
-            content = response.choices[0].message.content or ""
+            content = response.content
             if content.strip():
                 return True, "Connection successful"
 
-            finish_reason = response.choices[0].finish_reason
+            finish_reason = response.finish_reason
             return False, f"Connection returned empty content (finish_reason={finish_reason})"
         except Exception as e:
             return False, f"{type(e).__name__}: {str(e)}"

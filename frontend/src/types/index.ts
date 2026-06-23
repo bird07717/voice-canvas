@@ -136,12 +136,16 @@ export interface VoiceCommandResponse {
     source?: string
     patch_status?: string
     patch_count?: number
+    repaired?: boolean
+    fallback_reason?: string | null
   }
   svg_scene?: {
     scene_type: string
     title: string
     source: string
     svg?: string
+    repaired?: boolean
+    fallback_reason?: string | null
   }
   needs_disambiguation?: boolean
   disambiguation?: {

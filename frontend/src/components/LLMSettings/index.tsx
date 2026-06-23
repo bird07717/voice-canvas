@@ -8,6 +8,7 @@ import {
   Modal,
   message,
   Space,
+  Select,
   Tag,
   Popconfirm,
 } from 'antd'
@@ -20,6 +21,22 @@ import {
 import { useLLMStore } from '@/stores/llmStore'
 import { apiService } from '@/services/api'
 import './LLMSettings.css'
+
+const API_FORMAT_OPTIONS = [
+  { label: 'OpenAI 兼容', value: 'openai' },
+  { label: 'Anthropic Messages', value: 'anthropic' },
+]
+
+const API_FORMAT_DEFAULTS: Record<string, { base_url: string; model_name: string }> = {
+  openai: {
+    base_url: 'https://api.openai.com/v1',
+    model_name: 'gpt-5.5',
+  },
+  anthropic: {
+    base_url: 'https://api.anthropic.com',
+    model_name: 'claude-sonnet-4-5',
+  },
+}
 
 export default function LLMSettings() {
   const { configs, setConfigs } = useLLMStore()
@@ -44,13 +61,27 @@ export default function LLMSettings() {
   const handleAdd = () => {
     setEditingConfig(null)
     form.resetFields()
+    form.setFieldsValue({
+      api_format: 'openai',
+      base_url: API_FORMAT_DEFAULTS.openai.base_url,
+      model_name: API_FORMAT_DEFAULTS.openai.model_name,
+    })
     setModalVisible(true)
   }
 
   const handleEdit = (config: any) => {
     setEditingConfig(config)
-    form.setFieldsValue(config)
+    form.setFieldsValue({
+      ...config,
+      api_format: config.api_format || 'openai',
+    })
     setModalVisible(true)
+  }
+
+  const handleApiFormatChange = (apiFormat: string) => {
+    const defaults = API_FORMAT_DEFAULTS[apiFormat]
+    if (!defaults) return
+    form.setFieldsValue(defaults)
   }
 
   const handleDelete = async (id: number) => {
@@ -78,6 +109,7 @@ export default function LLMSettings() {
       const values = await form.validateFields()
       setTesting(true)
       const result = await apiService.testLLMConnection({
+        api_format: values.api_format,
         base_url: values.base_url,
         api_key: values.api_key,
         model_name: values.model_name,
@@ -160,6 +192,7 @@ export default function LLMSettings() {
               </Space>
             </div>
             <div className="config-info">
+              <p>格式: {config.api_format === 'anthropic' ? 'Anthropic Messages' : 'OpenAI 兼容'}</p>
               <p>模型: {config.model_name}</p>
               <p>URL: {config.base_url}</p>
             </div>
@@ -203,11 +236,20 @@ export default function LLMSettings() {
           </Form.Item>
 
           <Form.Item
+            name="api_format"
+            label="API 格式"
+            rules={[{ required: true, message: '请选择API格式' }]}
+            initialValue="openai"
+          >
+            <Select options={API_FORMAT_OPTIONS} onChange={handleApiFormatChange} />
+          </Form.Item>
+
+          <Form.Item
             name="base_url"
             label="Base URL"
             rules={[{ required: true, message: '请输入Base URL' }]}
           >
-            <Input placeholder="https://api.openai.com/v1" />
+            <Input placeholder="https://api.openai.com/v1 或 https://api.anthropic.com" />
           </Form.Item>
 
           <Form.Item
@@ -222,9 +264,9 @@ export default function LLMSettings() {
             name="model_name"
             label="模型名称"
             rules={[{ required: true, message: '请输入模型名称' }]}
-            initialValue="gpt-3.5-turbo"
+            initialValue={API_FORMAT_DEFAULTS.openai.model_name}
           >
-            <Input placeholder="gpt-3.5-turbo" />
+            <Input placeholder="gpt-5.5 或 claude-sonnet-4-5" />
           </Form.Item>
         </Form>
       </Modal>
@@ -232,7 +274,7 @@ export default function LLMSettings() {
       <div className="llm-tips">
         <h4>说明：</h4>
         <ul>
-          <li>仅支持 OpenAI 格式的 API</li>
+          <li>支持 OpenAI 兼容格式和 Anthropic Messages API 格式</li>
           <li>可配置多个模型，但同时只能激活一个</li>
           <li>激活的模型将用于语音命令处理</li>
         </ul>

@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from app.scene.svg_generator import SvgSceneGenerator
+from app.services.llm_client import LLMTextResponse
 
 
 class SvgSceneGeneratorTest(unittest.IsolatedAsyncioTestCase):
@@ -31,6 +32,34 @@ class SvgSceneGeneratorTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.source, "llm_svg_scene_fallback")
         self.assertIn("<svg", result.svg)
+        self.assertEqual(result.fallback_reason, "RuntimeError: boom")
+
+    async def test_generate_repairs_invalid_svg_once(self):
+        generator = SvgSceneGenerator()
+        fake_config = type(
+            "Config",
+            (),
+            {
+                "api_key": "test",
+                "base_url": "http://example.invalid",
+                "model_name": "test-model",
+            },
+        )()
+
+        async def fake_complete_text(config, messages, **kwargs):
+            user_content = messages[-1]["content"]
+            if "校验错误" in user_content:
+                content = "<svg viewBox='0 0 800 600'><rect width='800' height='600' fill='blue'/></svg>"
+            else:
+                content = "<svg viewBox='0 0 800 600'><rect width='800' height='600'></svg>"
+            return LLMTextResponse(content=content, finish_reason="stop")
+
+        with patch("app.scene.svg_generator.complete_text", AsyncMock(side_effect=fake_complete_text)):
+            result = await generator.generate("画一幅蓝色抽象画", None, fake_config)
+
+        self.assertEqual(result.source, "llm_svg_scene_repaired")
+        self.assertTrue(result.repaired)
+        self.assertIn("<rect", result.svg)
 
     def test_extracts_svg_from_markdown_response(self):
         generator = SvgSceneGenerator()

@@ -5,6 +5,7 @@ from datetime import datetime
 
 class LLMConfigCreate(BaseModel):
     name: str
+    api_format: str = "openai"
     base_url: str
     api_key: str
     model_name: str = "gpt-3.5-turbo"
@@ -12,6 +13,7 @@ class LLMConfigCreate(BaseModel):
 
 class LLMConfigUpdate(BaseModel):
     name: Optional[str] = None
+    api_format: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     model_name: Optional[str] = None
@@ -21,6 +23,7 @@ class LLMConfigResponse(BaseModel):
     id: int
     user_id: int
     name: str
+    api_format: str = "openai"
     base_url: str
     api_key: str  # 注意：实际生产中应该隐藏或脱敏
     model_name: str
@@ -32,6 +35,7 @@ class LLMConfigResponse(BaseModel):
 
 
 class LLMTestRequest(BaseModel):
+    api_format: str = "openai"
     base_url: str
     api_key: str
     model_name: str

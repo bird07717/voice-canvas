@@ -13,7 +13,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { PENDING_TARGET, matchFastCommand } from '@/services/fastCommandMatcher'
+import { PENDING_TARGET, matchFastCommand, matchTemplateSceneShortcut } from '@/services/fastCommandMatcher'
 import { ResolveAction, resolveObjectTarget } from '@/services/objectResolver'
 import {
   buildMoveByUpdates,
@@ -70,6 +70,20 @@ const getLLMRouteLabel = (route?: string, llmUsed?: boolean) => {
   }
 }
 
+const getSceneGenerationStatus = (response: { scene?: any; commands: DrawCommand[] }, routeLabel: string) => {
+  if (!response.scene) return ''
+
+  const objectCount = response.scene.object_count || response.commands.length
+  const base = `执行状态：${routeLabel || '场景生成'}，已生成 ${objectCount} 个对象`
+  if (response.scene.source === 'llm_svg_scene_fallback') {
+    return `${base}；AI SVG 生成失败，已使用本地兜底图`
+  }
+  if (response.scene.repaired) {
+    return `${base}；首轮 SVG 校验失败，已自动修复`
+  }
+  return base
+}
+
 const SCENE_SHORTCUTS = [
   { title: '海边日落', tone: '暖阳海面' },
   { title: '公园', tone: '草地长椅' },
@@ -84,6 +98,7 @@ const SCENE_SHORTCUTS = [
 ]
 const COLLAPSED_SCENE_COUNT = 5
 const DISAMBIGUATION_TIMEOUT_MS = 30000
+const INTERIM_TEMPLATE_SCENE_COOLDOWN_MS = 1500
 
 const translateSceneObject = (obj: CanvasObject, dx: number, dy: number): CanvasObject => {
   const params = { ...(obj.params || {}) }
@@ -197,6 +212,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const [isStarting, setIsStarting] = useState(false)
   const lastFinalTextRef = useRef('')
   const lastFinalTimeRef = useRef(0)
+  const lastInterimTemplateSceneRef = useRef<{ normalizedText: string; time: number } | null>(null)
   const commandSequenceRef = useRef(0)
   const pendingDisambiguationRef = useRef<PendingDisambiguation | null>(null)
 
@@ -241,16 +257,39 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
           setErrorMessage('')
           setStatus('recognizing')
           setExecutionMessage(isFinal ? '正在匹配命令...' : '正在识别...')
-          if (isFinal) {
-            const normalizedText = text.trim()
+          if (!isFinal) {
+            const shortcut = matchTemplateSceneShortcut(text)
             const now = Date.now()
             if (
-              normalizedText &&
-              (normalizedText !== lastFinalTextRef.current || now - lastFinalTimeRef.current > 2000)
+              shortcut &&
+              (
+                lastInterimTemplateSceneRef.current?.normalizedText !== shortcut.normalizedText ||
+                now - lastInterimTemplateSceneRef.current.time > INTERIM_TEMPLATE_SCENE_COOLDOWN_MS
+              )
             ) {
-              lastFinalTextRef.current = normalizedText
+              lastInterimTemplateSceneRef.current = {
+                normalizedText: shortcut.normalizedText,
+                time: now,
+              }
+              lastFinalTextRef.current = shortcut.canonicalText
               lastFinalTimeRef.current = now
-              handleVoiceCommand(normalizedText)
+              setExecutionMessage(`快速识别到${shortcut.title}模板，正在生成...`)
+              handleVoiceCommand(shortcut.canonicalText)
+              return
+            }
+          }
+          if (isFinal) {
+            const normalizedText = text.trim()
+            const shortcut = matchTemplateSceneShortcut(normalizedText)
+            const finalCommandText = shortcut?.canonicalText || normalizedText
+            const now = Date.now()
+            if (
+              finalCommandText &&
+              (finalCommandText !== lastFinalTextRef.current || now - lastFinalTimeRef.current > 2000)
+            ) {
+              lastFinalTextRef.current = finalCommandText
+              lastFinalTimeRef.current = now
+              handleVoiceCommand(finalCommandText)
             }
           }
         },
@@ -280,13 +319,17 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const handleStopVoice = () => {
     voiceService.stopListening()
     setIsListening(false)
-    setStatus('idle')
-    setExecutionMessage('')
+    const currentStatus = useVoiceStore.getState().status
+    if (!['thinking', 'drawing', 'matched'].includes(currentStatus)) {
+      setStatus('idle')
+      setExecutionMessage('')
+    }
   }
 
   const handleResetVoice = () => {
     commandSequenceRef.current += 1
     pendingDisambiguationRef.current = null
+    lastInterimTemplateSceneRef.current = null
     clearDisambiguationCandidates()
     voiceService.stopListening()
     setIsListening(false)
@@ -498,7 +541,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       setStatus('done')
       setExecutionMessage(
         response.scene
-          ? `执行状态：${routeLabel || '场景生成'}，已生成 ${response.scene.object_count || response.commands.length} 个对象`
+          ? getSceneGenerationStatus(response, routeLabel)
           : response.response || '已完成'
       )
     } catch (error: any) {

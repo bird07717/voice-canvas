@@ -160,6 +160,7 @@ class ApiService {
 
   async createLLMConfig(data: {
     name: string
+    api_format: string
     base_url: string
     api_key: string
     model_name: string
@@ -172,6 +173,7 @@ class ApiService {
     id: number,
     data: Partial<{
       name: string
+      api_format: string
       base_url: string
       api_key: string
       model_name: string
@@ -192,6 +194,7 @@ class ApiService {
   }
 
   async testLLMConnection(data: {
+    api_format: string
     base_url: string
     api_key: string
     model_name: string
