@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from app.drawing.object_request import SimpleObjectRequest, build_simple_object_request
 from app.scene.intent import is_open_visual_draw_request
 from app.scene.schemas import ScenePlan
 from app.scene.templates import build_template_scene_plan
 
 
 LLMRoute = Literal[
+    "local_object",
     "template_scene",
     "template_scene_patch",
     "open_scene",
@@ -21,6 +23,7 @@ class LLMRouteDecision:
     requires_llm: bool
     reason: str
     template_scene_plan: Optional[ScenePlan] = None
+    simple_object_request: Optional[SimpleObjectRequest] = None
 
 
 def has_scene_patch_hint(text: str, scene_title: str, scene_type: str) -> bool:
@@ -105,6 +108,19 @@ def classify_llm_route(text: str, has_llm_config: bool = True) -> LLMRouteDecisi
             requires_llm=False,
             reason="固定模板命中，本地生成稳定场景",
             template_scene_plan=template_scene_plan,
+        )
+
+    simple_object_request = build_simple_object_request(text)
+    if simple_object_request:
+        return LLMRouteDecision(
+            route="local_object",
+            requires_llm=False,
+            reason=(
+                "命中本地 SVG 素材，直接生成对象"
+                if simple_object_request.source == "svg_asset"
+                else "命中本地模板对象，直接生成对象"
+            ),
+            simple_object_request=simple_object_request,
         )
 
     if is_open_visual_draw_request(text):

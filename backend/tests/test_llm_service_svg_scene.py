@@ -5,6 +5,23 @@ from app.services.llm_service import LLMService
 
 
 class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
+    async def test_local_asset_object_does_not_require_llm_config(self):
+        service = LLMService()
+        service.get_active_config = AsyncMock(return_value=None)
+
+        result = await service.process_command(
+            user_id=1,
+            text="画一只小猫",
+            canvas_context={},
+        )
+
+        self.assertEqual(result["intent"], "draw")
+        self.assertEqual(result["llm_route"], "local_object")
+        self.assertFalse(result["llm_used"])
+        self.assertEqual(result["commands"][0]["type"], "image")
+        self.assertEqual(result["commands"][0]["params"]["assetSource"], "svg")
+        self.assertIn("/svg-assets/animals/cat.svg", result["commands"][0]["params"]["imageUrl"])
+
     async def test_open_scene_returns_svg_image_command(self):
         service = LLMService()
         service.get_active_config = AsyncMock(

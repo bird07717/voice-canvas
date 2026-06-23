@@ -13,7 +13,7 @@ import { useLLMStore } from '@/stores/llmStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { voiceService } from '@/services/voiceService'
 import { apiService } from '@/services/api'
-import { PENDING_TARGET, isTemplateSceneRequest, matchFastCommand } from '@/services/fastCommandMatcher'
+import { PENDING_TARGET, matchFastCommand } from '@/services/fastCommandMatcher'
 import { ResolveAction, resolveObjectTarget } from '@/services/objectResolver'
 import {
   buildMoveByUpdates,
@@ -53,6 +53,8 @@ type PreparedCommandsResult =
 
 const getLLMRouteLabel = (route?: string, llmUsed?: boolean) => {
   switch (route) {
+    case 'local_object':
+      return '本地素材/模板'
     case 'template_scene':
       return '固定模板'
     case 'template_scene_patch':
@@ -178,7 +180,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus,
     setRecognitionType
   } = useVoiceStore()
-  const { activeConfig, setConfigs, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
+  const { activeConfig, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
   const {
     addObject,
     replaceSceneObjects,
@@ -292,20 +294,6 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus('idle')
   }
 
-  const loadActiveLLMConfig = async () => {
-    const currentActiveConfig = useLLMStore.getState().activeConfig
-    if (currentActiveConfig) return currentActiveConfig
-
-    try {
-      const configs = await apiService.getLLMConfigs()
-      setConfigs(configs)
-      return configs.find((config: any) => config.is_active) || null
-    } catch (error) {
-      console.error('刷新LLM配置失败', error)
-      return null
-    }
-  }
-
   const handleVoiceCommand = async (text: string) => {
     const canvasState = useCanvasStore.getState()
     if (!canvasState.currentCanvasId || !text.trim()) return
@@ -392,28 +380,12 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
       }
     }
 
-    const canUseTemplateScene = isTemplateSceneRequest(text)
-    let resolvedActiveConfig = activeConfig
-    if (!resolvedActiveConfig && !canUseTemplateScene) {
-      setStatus('thinking')
-      setExecutionMessage('正在检查 LLM 模型配置...')
-      resolvedActiveConfig = await loadActiveLLMConfig()
-      if (!isCurrentCommand()) return
-    }
-
-    if (!resolvedActiveConfig && !canUseTemplateScene) {
-      setStatus('error')
-      setLastCommandSource(null)
-      setInterpretedText('需要 AI 理解的复杂命令')
-      setErrorMessage('未配置LLM模型，复杂命令暂时无法理解。请先在首页设置中配置LLM。')
-      setExecutionMessage('')
-      return
-    }
+    const resolvedActiveConfig = activeConfig
 
     setStatus('thinking')
     setLastCommandSource('llm')
-    setInterpretedText(resolvedActiveConfig ? '第三层 LLM 增强正在理解。' : '固定场景模板，后端快速生成。')
-    setExecutionMessage(resolvedActiveConfig ? 'AI 正在生成 SVG 场景或编辑画面...' : '正在生成模板场景...')
+    setInterpretedText('后端智能路由正在理解。')
+    setExecutionMessage('正在匹配本地素材、场景模板或 AI 规划...')
     setIsProcessing(true)
 
     try {
@@ -1292,7 +1264,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
         {!activeConfig && (
           <div className="voice-status-info">
             <p>
-              ⚠️ 未配置LLM模型，请先在首页设置中配置LLM。
+              未配置 LLM 模型时，仍可使用快速命令、本地 SVG 素材和固定场景；开放式复杂绘图需要先配置模型。
             </p>
           </div>
         )}

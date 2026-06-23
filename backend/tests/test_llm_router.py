@@ -41,6 +41,28 @@ class LLMRouterTest(unittest.TestCase):
         self.assertTrue(decision.requires_llm)
         self.assertIsNone(decision.template_scene_plan)
 
+    def test_simple_asset_object_uses_local_route(self):
+        for text in ("画一只小猫", "画一台电脑", "画一张桌子"):
+            with self.subTest(text=text):
+                decision = classify_llm_route(text, has_llm_config=False)
+                self.assertEqual(decision.route, "local_object")
+                self.assertFalse(decision.requires_llm)
+                self.assertIsNotNone(decision.simple_object_request)
+
+    def test_simple_template_object_uses_local_route(self):
+        decision = classify_llm_route("画一艘帆船", has_llm_config=False)
+
+        self.assertEqual(decision.route, "local_object")
+        self.assertFalse(decision.requires_llm)
+        self.assertIsNotNone(decision.simple_object_request)
+
+    def test_unknown_object_does_not_match_single_character_asset_alias(self):
+        decision = classify_llm_route("画一个机器人", has_llm_config=True)
+
+        self.assertEqual(decision.route, "open_scene")
+        self.assertTrue(decision.requires_llm)
+        self.assertIsNone(decision.simple_object_request)
+
     def test_polite_open_room_scene_routes_to_svg_scene_generator(self):
         for text in (
             "帮我画一个赛博朋克式的书房",

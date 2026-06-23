@@ -124,7 +124,7 @@ export interface VoiceCommandResponse {
   commands: DrawCommand[]
   response: string
   reason?: string
-  llm_route?: 'template_scene' | 'template_scene_patch' | 'open_scene' | 'tool_plan' | 'requires_llm'
+  llm_route?: 'local_object' | 'template_scene' | 'template_scene_patch' | 'open_scene' | 'tool_plan' | 'requires_llm'
   llm_used?: boolean
   routing_reason?: string
   scene?: {

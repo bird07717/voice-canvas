@@ -57,6 +57,10 @@ def _tokens(text: str) -> List[str]:
     return [part for part in re.split(r"\s+", normalized) if part]
 
 
+def _match_text(text: str) -> str:
+    return re.sub(r"[\s，。！？、,.!?:：_\-./\\]+", "", str(text or "").lower())
+
+
 def _public_url(root: Path, file_path: Path) -> str:
     """生成SVG资源的public URL
 
@@ -189,3 +193,44 @@ class AssetResolver:
                 best_score = score
 
         return best_asset if best_score > 0 else None
+
+    def resolve_text(self, text: str) -> Optional[SVGAsset]:
+        """Resolve a spoken object request by substring matching labels and aliases."""
+        normalized = _match_text(text)
+        if not normalized:
+            return None
+
+        best_asset: Optional[SVGAsset] = None
+        best_score = 0
+        for asset in self.list_assets():
+            terms = [asset.asset_id, asset.kind, asset.label, *asset.aliases]
+            asset_best = 0
+            for term in terms:
+                candidate = _match_text(term)
+                if not candidate:
+                    continue
+
+                if normalized == candidate:
+                    score = 150 + len(candidate)
+                elif len(candidate) >= 2 and candidate in normalized:
+                    score = 95 + len(candidate) * 2
+                elif len(normalized) >= 2 and len(candidate) >= 2 and normalized in candidate:
+                    score = 70 + len(normalized)
+                else:
+                    overlap = set(_tokens(text)) & set(_tokens(term))
+                    score = len(overlap) * 18
+
+                asset_best = max(asset_best, score)
+
+            if _match_text(asset.kind) == normalized:
+                asset_best += 25
+            if _match_text(asset.label) == normalized:
+                asset_best += 20
+            if _match_text(asset.asset_id).endswith("/" + normalized) or _match_text(asset.asset_id) == normalized:
+                asset_best += 12
+
+            if asset_best > best_score:
+                best_asset = asset
+                best_score = asset_best
+
+        return best_asset if best_score >= 70 else None

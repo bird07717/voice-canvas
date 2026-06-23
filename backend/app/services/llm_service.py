@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.drawing.executor import DrawingExecutor
+from app.drawing.schemas import CreateObjectArgs, DrawingPlan
 from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
 from app.scene.executor import SceneExecutor
@@ -381,6 +382,17 @@ arguments: {"reason": "忽略原因"}
         executed = DrawingExecutor(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
 
+    def _tool_plan_needs_svg_fallback(
+        self,
+        plan: DrawingPlan,
+        normalized: Dict[str, Any],
+    ) -> bool:
+        if normalized.get("commands"):
+            return False
+        if normalized.get("intent") not in {"draw", "clarify"}:
+            return False
+        return any(isinstance(call.arguments, CreateObjectArgs) for call in plan.calls)
+
     def _execute_svg_scene_response(
         self,
         svg_scene: Any,
@@ -607,6 +619,26 @@ arguments: {"reason": "忽略原因"}
                 "disambiguation": patched.get("disambiguation"),
             }
 
+        if decision.route == "local_object" and decision.simple_object_request:
+            object_request = decision.simple_object_request
+            commands = DrawingExecutor(canvas_context)._create_object(object_request.args)
+            return {
+                "intent": "draw",
+                "confidence": 1.0,
+                "commands": commands,
+                "response": f"好的，我添加了{object_request.label}。",
+                "reason": object_request.source,
+                "llm_route": "local_object",
+                "llm_used": False,
+                "routing_reason": decision.reason,
+                "local_object": {
+                    "source": object_request.source,
+                    "label": object_request.label,
+                    "asset_id": object_request.asset.asset_id if object_request.asset else None,
+                    "kind": object_request.args.kind,
+                },
+            }
+
         if llm_config_id:
             config = await self.get_config_by_id(llm_config_id)
         else:
@@ -662,7 +694,19 @@ arguments: {"reason": "忽略原因"}
             try:
                 result = self._extract_json(content or "")
                 if "calls" in result:
-                    normalized = self._execute_tool_plan(result, canvas_context)
+                    plan = parse_drawing_plan(result)
+                    executed = DrawingExecutor(canvas_context).execute(plan)
+                    normalized = self._normalize_llm_result(executed)
+                    if self._tool_plan_needs_svg_fallback(plan, normalized):
+                        svg_scene = await SvgSceneGenerator().generate(
+                            text=text,
+                            canvas_context=canvas_context,
+                            llm_config=config,
+                        )
+                        return self._execute_svg_scene_response(
+                            svg_scene,
+                            "LLM 工具规划没有生成可执行创建命令，回退到 SVG 场景生成",
+                        )
                 else:
                     normalized = self._normalize_llm_result(result)
                 normalized.update({
