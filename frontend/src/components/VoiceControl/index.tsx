@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, Space, message, Tag } from 'antd'
+import { Button, Input, Space, message, Tag } from 'antd'
 import {
   AudioMutedOutlined,
   AudioOutlined,
   DownOutlined,
   PictureOutlined,
   ReloadOutlined,
+  SendOutlined,
   UpOutlined,
 } from '@ant-design/icons'
 import { useVoiceStore } from '@/stores/voiceStore'
@@ -100,6 +101,7 @@ const INTERIM_TEMPLATE_SCENE_COOLDOWN_MS = 1500
 
 export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
   const [scenesExpanded, setScenesExpanded] = useState(false)
+  const [manualCommandText, setManualCommandText] = useState('')
   const {
     isListening,
     status,
@@ -120,7 +122,7 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setStatus,
     setRecognitionType
   } = useVoiceStore()
-  const { activeConfig, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
+  const { activeConfig, isProcessing, setIsProcessing, setChatHistory, addChatMessage } = useLLMStore()
   const {
     recordCommands,
     setDisambiguationCandidates,
@@ -271,6 +273,15 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
     setIsListening(false)
     resetVoiceFeedback()
     setStatus('idle')
+  }
+
+  const handleManualCommandSubmit = (value?: string) => {
+    const text = (value ?? manualCommandText).trim()
+    if (!text) return
+
+    setManualCommandText('')
+    setRecognizedText(text)
+    handleVoiceCommand(text)
   }
 
   const handleVoiceCommand = async (text: string) => {
@@ -775,6 +786,18 @@ export default function VoiceControl({ onSave, onExport }: VoiceControlProps) {
               {errorMessage}
             </div>
           )}
+          <div className="manual-command-entry">
+            <Input.Search
+              value={manualCommandText}
+              onChange={(event) => setManualCommandText(event.target.value)}
+              onSearch={handleManualCommandSubmit}
+              placeholder="输入文字指令"
+              enterButton={<SendOutlined />}
+              loading={isProcessing}
+              disabled={status === 'thinking' || status === 'drawing'}
+              allowClear
+            />
+          </div>
         </div>
 
         <div className="voice-tips">
