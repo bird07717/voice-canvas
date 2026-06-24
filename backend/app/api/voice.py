@@ -16,8 +16,21 @@ from app.schemas.canvas import (
     ChatMessage
 )
 from app.services.llm_service import LLMService
+from app.scene.templates import get_scene_manifest
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
+DRAW_COMMAND_PROTOCOL = "draw-command-v1"
+
+
+@router.get("/scene-manifest")
+async def get_voice_scene_manifest(
+    current_user: User = Depends(get_current_user)
+):
+    """Return backend-owned template scene metadata for frontend shortcuts."""
+    return {
+        "version": "scene-template-manifest-v1",
+        "templates": get_scene_manifest(),
+    }
 
 
 async def get_baidu_access_token(api_key: str, secret_key: str) -> str:
@@ -156,6 +169,7 @@ async def process_voice_command(
         return VoiceCommandResponse(
             intent=llm_response["intent"],
             confidence=llm_response["confidence"],
+            command_protocol=llm_response.get("command_protocol", DRAW_COMMAND_PROTOCOL),
             commands=[],
             response="",
             reason=llm_response.get("reason"),
@@ -185,6 +199,7 @@ async def process_voice_command(
         command_json={
             "intent": llm_response["intent"],
             "confidence": llm_response["confidence"],
+            "command_protocol": llm_response.get("command_protocol", DRAW_COMMAND_PROTOCOL),
             "commands": llm_response["commands"],
             "reason": llm_response.get("reason"),
             "llm_route": llm_response.get("llm_route"),
@@ -211,6 +226,7 @@ async def process_voice_command(
     return VoiceCommandResponse(
         intent=llm_response["intent"],
         confidence=llm_response["confidence"],
+        command_protocol=llm_response.get("command_protocol", DRAW_COMMAND_PROTOCOL),
         commands=llm_response["commands"],
         response=llm_response["response"],
         reason=llm_response.get("reason"),

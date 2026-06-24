@@ -46,6 +46,7 @@ class VoiceCommandRequest(BaseModel):
 class VoiceCommandResponse(BaseModel):
     intent: str
     confidence: float = 0.0
+    command_protocol: str = "draw-command-v1"
     commands: List[dict]
     response: str
     reason: Optional[str] = None

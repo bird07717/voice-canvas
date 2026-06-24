@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.assets.resolver import AssetResolver, SVGAsset
-from app.drawing.executor import DrawingExecutor
+from app.drawing.executor import DrawingCommandCompiler
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
 from app.scene.schemas import SceneObject, ScenePlan
 
@@ -87,10 +87,10 @@ SIZE_PRESETS = {
 }
 
 
-class SceneExecutor:
+class SceneCommandCompiler:
     def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self.canvas_context = canvas_context or {}
-        self.drawing_executor = DrawingExecutor(canvas_context)
+        self.drawing_compiler = DrawingCommandCompiler(canvas_context)
         self.asset_resolver = AssetResolver()
         self.anchor_usage: Dict[str, int] = {}
 
@@ -119,7 +119,7 @@ class SceneExecutor:
             commands.append({
                 "action": "create",
                 "type": "rect",
-                "id": self.drawing_executor._next_id(),
+                "id": self.drawing_compiler._next_id(),
                 "params": {
                     "x": 0,
                     "y": 0,
@@ -141,7 +141,7 @@ class SceneExecutor:
             commands.append({
                 "action": "create",
                 "type": "rect",
-                "id": self.drawing_executor._next_id(),
+                "id": self.drawing_compiler._next_id(),
                 "params": {
                     "x": 0,
                     "y": y,
@@ -191,7 +191,7 @@ class SceneExecutor:
             description=scene_object.description or scene_object.label,
         )
 
-        commands = self.drawing_executor._create_object(args)
+        commands = self.drawing_compiler._create_object(args)
         for command in commands:
             self._attach_scene_metadata(command, scene_object, plan)
             self._attach_text_layout(command, scene_object)
@@ -230,7 +230,7 @@ class SceneExecutor:
         return {
             "action": "create",
             "type": "image",
-            "id": self.drawing_executor._next_id(),
+                "id": self.drawing_compiler._next_id(),
             "params": params,
         }
 
@@ -381,3 +381,6 @@ class SceneExecutor:
             "star": "星星",
         }
         return labels.get(self._normalize_kind(kind), kind)
+
+
+SceneExecutor = SceneCommandCompiler

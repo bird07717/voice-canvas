@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { message } from 'antd'
-import { VoiceCommandRequest, VoiceCommandResponse } from '@/types'
+import { SceneTemplateManifestResponse, VoiceCommandRequest, VoiceCommandResponse } from '@/types'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -121,6 +121,11 @@ class ApiService {
     const response = await this.client.post('/api/voice/command', data, {
       timeout: 150000,
     })
+    return response.data
+  }
+
+  async getSceneManifest(): Promise<SceneTemplateManifestResponse> {
+    const response = await this.client.get('/api/voice/scene-manifest')
     return response.data
   }
 

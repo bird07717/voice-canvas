@@ -47,8 +47,8 @@ class SvgSceneValidationError(SvgSceneGeneratorError):
 
 
 class SvgSceneGenerator:
-    SYSTEM_PROMPT = """你是语音绘画系统的第三层 SVG 画面生成器。
-前两层已经处理了快速几何命令和固定场景模板。
+    SYSTEM_PROMPT = """你是语音绘画系统的开放式 SVG 整图生成器。
+前端快速命令、后端本地对象和固定场景模板已经处理了确定性请求。
 你只负责把用户的开放式绘画需求，直接写成一整张可渲染的 SVG 画面。
 
 只输出一个完整的 <svg>...</svg>，不要 JSON，不要 Markdown，不要解释。
@@ -65,7 +65,7 @@ class SvgSceneGenerator:
 - 优先生成稳定、可解析的 SVG，同时保留足够画面细节。
 - 如果用户要求赛博朋克、图书馆、咖啡馆、房间、教室、生日贺卡、海边、森林等，直接围绕该主题创作。
 - 文字要直接写进 SVG 里。
-- 场景要像一整张作品，而不是对象清单。
+- 场景要像一整张作品，而不是对象清单；生成结果会作为一个整体 image 放入画布，不提供对象级拆分编辑。
 """
 
     def __init__(self) -> None:

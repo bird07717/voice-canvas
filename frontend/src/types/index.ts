@@ -12,6 +12,7 @@ export interface CommandTargetQuery {
 export interface DrawCommand {
   action:
     | 'create'
+    | 'replaceScene'
     | 'modify'
     | 'move'
     | 'moveBy'
@@ -117,10 +118,25 @@ export type VoiceIntent =
   | 'clarify'
   | 'ignore'
 
+export type SceneRenderMode = 'object_scene' | 'svg_image'
+
+export interface SceneTemplateManifestItem {
+  scene_type: string
+  title: string
+  aliases: string[]
+  render_mode: SceneRenderMode
+}
+
+export interface SceneTemplateManifestResponse {
+  version: string
+  templates: SceneTemplateManifestItem[]
+}
+
 // 语音命令响应
 export interface VoiceCommandResponse {
   intent: VoiceIntent
   confidence: number
+  command_protocol?: 'draw-command-v1'
   commands: DrawCommand[]
   response: string
   reason?: string
@@ -131,6 +147,7 @@ export interface VoiceCommandResponse {
     scene_type: string
     title: string
     style: string
+    render_mode?: SceneRenderMode
     object_count: number
     layout_notes?: string | null
     source?: string

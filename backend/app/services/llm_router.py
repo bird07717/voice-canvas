@@ -137,7 +137,7 @@ def classify_llm_route(text: str, has_llm_config: bool = True) -> LLMRouteDecisi
         return LLMRouteDecision(
             route="open_scene" if has_llm_config else "requires_llm",
             requires_llm=True,
-            reason="第三层通用开放绘画请求，交给 LLM 直接生成 SVG 场景",
+            reason="开放式绘画请求，交给 LLM 直接生成 SVG 整图",
         )
 
     return LLMRouteDecision(

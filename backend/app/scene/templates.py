@@ -239,6 +239,18 @@ def get_scene_title(scene_type: str) -> str:
     return SCENE_TITLES.get(normalized, normalized)
 
 
+def get_scene_manifest() -> List[Dict[str, Any]]:
+    return [
+        {
+            "scene_type": scene_type,
+            "title": get_scene_title(scene_type),
+            "aliases": list(aliases),
+            "render_mode": "object_scene",
+        }
+        for scene_type, aliases in SCENE_TEXT_ALIASES
+    ]
+
+
 def match_template_scene_type(text: str) -> Optional[str]:
     normalized = "".join(str(text or "").split())
     if not normalized:

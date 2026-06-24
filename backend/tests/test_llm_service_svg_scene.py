@@ -6,6 +6,21 @@ from app.services.llm_client import LLMTextResponse
 
 
 class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
+    async def test_template_scene_returns_object_scene_render_mode(self):
+        service = LLMService()
+        service.get_active_config = AsyncMock(return_value=None)
+
+        result = await service.process_command(
+            user_id=1,
+            text="画一个公园",
+            canvas_context={},
+        )
+
+        self.assertEqual(result["intent"], "draw")
+        self.assertEqual(result["llm_route"], "template_scene")
+        self.assertEqual(result["scene"]["render_mode"], "object_scene")
+        self.assertGreater(result["scene"]["object_count"], 1)
+
     async def test_local_asset_object_does_not_require_llm_config(self):
         service = LLMService()
         service.get_active_config = AsyncMock(return_value=None)
@@ -64,6 +79,7 @@ class LLMServiceSvgSceneTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["intent"], "draw")
         self.assertEqual(result["llm_route"], "open_scene")
         self.assertEqual(result["scene"]["source"], "llm_svg_scene")
+        self.assertEqual(result["scene"]["render_mode"], "svg_image")
         self.assertEqual(result["scene"]["object_count"], 1)
         self.assertEqual(result["commands"][0]["type"], "image")
         self.assertTrue(result["commands"][0]["params"]["imageUrl"].startswith("data:image/svg+xml;base64,"))

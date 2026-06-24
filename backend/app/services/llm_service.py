@@ -1,20 +1,19 @@
 import json
-import hashlib
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.drawing.executor import DrawingExecutor
-from app.drawing.object_request import SimpleObjectMatch, build_simple_object_request_from_match
+from app.drawing.executor import DrawingCommandCompiler
 from app.drawing.tool_parser import ToolParseError, parse_drawing_plan
 from app.models.llm_config import LLMConfig
-from app.scene.executor import SceneExecutor
-from app.scene.patch import ScenePatchPlanner, ScenePatchPlanningError
-from app.scene.patch_executor import ScenePatchExecutor
 from app.scene.svg_generator import SvgSceneGenerator
-from app.scene.templates import build_template_scene_plan_by_type
 from app.assets.resolver import AssetResolver
+from app.services.command_planning_service import (
+    LocalObjectCommandService,
+    OpenSvgSceneCommandService,
+    SceneCommandService,
+)
 from app.services.llm_client import complete_text, complete_text_with_config
-from app.services.llm_router import classify_llm_route, has_scene_patch_hint
+from app.services.llm_router import classify_llm_route
 
 
 TOOL_PLANNING_TIMEOUT_SECONDS = 20.0
@@ -150,13 +149,13 @@ class LLMService:
 }
 """
 
-    TOOL_PLANNING_PROMPT = """你是语音绘画系统的第三层 LLM 增强工具规划器。
+    TOOL_PLANNING_PROMPT = """你是语音绘画系统的 LLM 工具规划器。
 
-前两层已经处理了：
+前端快速命令和后端确定性规划已经处理了：
 - 本地快速命令：撤销、重做、保存、导出、清空、简单几何图形、常见改色/移动/缩放/删除/选择。
 - 固定场景模板：海边日落、公园、生日贺卡、城市夜景、森林小屋、山水风景、教室、温馨客厅、桌面工作区、节日派对。
 
-你只处理前两层无法稳定覆盖的开放对象创建、复杂编辑和模板外补充表达。
+你只处理确定性路径无法稳定覆盖的对象创建、复杂编辑和模板外补充表达。
 
 用户会用自然中文口语表达绘画需求。你的任务不是直接生成底层Canvas图形，而是选择合适的高层工具调用。
 
@@ -273,6 +272,9 @@ arguments: {"reason": "忽略原因"}
     def __init__(self, db: Optional[AsyncSession] = None):
         self.db = db
         self.asset_resolver = AssetResolver()
+        self.local_object_service = LocalObjectCommandService(self.asset_resolver)
+        self.scene_command_service = SceneCommandService()
+        self.open_svg_scene_service = OpenSvgSceneCommandService()
 
     def _extract_json(self, content: str) -> Dict[str, Any]:
         """Parse strict JSON, with a small fallback for models that add prose."""
@@ -384,189 +386,8 @@ arguments: {"reason": "忽略原因"}
         canvas_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         plan = parse_drawing_plan(result)
-        executed = DrawingExecutor(canvas_context).execute(plan)
+        executed = DrawingCommandCompiler(canvas_context).execute(plan)
         return self._normalize_llm_result(executed)
-
-    def _object_match_from_decision(self, decision: Any) -> Optional[SimpleObjectMatch]:
-        if not (
-            decision.matched_object_kind
-            and decision.matched_object_label
-            and decision.matched_object_source
-        ):
-            return None
-        return SimpleObjectMatch(
-            kind=decision.matched_object_kind,
-            source=decision.matched_object_source,
-            label=decision.matched_object_label,
-            asset_id=decision.matched_asset_id,
-        )
-
-    def _execute_svg_scene_response(
-        self,
-        svg_scene: Any,
-        routing_reason: str,
-    ) -> Dict[str, Any]:
-        object_id = f"llm_svg_{hashlib.sha1(svg_scene.svg.encode('utf-8')).hexdigest()[:12]}"
-        svg_data_url = self._svg_to_data_url(svg_scene.svg)
-        commands = [
-            {
-                "action": "create",
-                "type": "image",
-                "id": object_id,
-                "params": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 800,
-                    "height": 600,
-                    "imageUrl": svg_data_url,
-                    "kind": "llm_svg_scene",
-                    "kindLabel": svg_scene.title,
-                    "sceneType": svg_scene.scene_type,
-                    "sceneTitle": svg_scene.title,
-                    "sceneStyle": svg_scene.style,
-                    "sceneRole": "full_scene",
-                    "assetSource": svg_scene.source,
-                    "rawSvg": svg_scene.svg,
-                },
-            }
-        ]
-        return {
-            "intent": "draw",
-            "confidence": 0.9,
-            "commands": commands,
-            "response": svg_scene.response,
-            "reason": "svg_scene",
-            "llm_route": "open_scene",
-            "llm_used": True,
-            "routing_reason": routing_reason,
-            "scene": {
-                "scene_type": svg_scene.scene_type,
-                "title": svg_scene.title,
-                "style": svg_scene.style,
-                "object_count": len(commands),
-                "layout_notes": svg_scene.layout_notes,
-                "source": svg_scene.source,
-                "repaired": bool(getattr(svg_scene, "repaired", False)),
-                "fallback_reason": getattr(svg_scene, "fallback_reason", None),
-            },
-            "svg_scene": {
-                "scene_type": svg_scene.scene_type,
-                "title": svg_scene.title,
-                "source": svg_scene.source,
-                "svg": svg_scene.svg,
-                "repaired": bool(getattr(svg_scene, "repaired", False)),
-                "fallback_reason": getattr(svg_scene, "fallback_reason", None),
-            },
-        }
-
-    def _svg_to_data_url(self, svg: str) -> str:
-        import base64
-
-        encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-        return f"data:image/svg+xml;base64,{encoded}"
-
-    def _has_scene_patch_hint(self, text: str, scene_title: str, scene_type: str) -> bool:
-        return has_scene_patch_hint(text, scene_title, scene_type)
-
-    async def _apply_scene_patch_if_needed(
-        self,
-        text: str,
-        template_scene_plan: Any,
-        commands: List[Dict[str, Any]],
-        config: Optional[LLMConfig],
-        canvas_context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        scene_payload = {
-            "scene_type": template_scene_plan.scene_type,
-            "title": template_scene_plan.title,
-            "style": template_scene_plan.style,
-            "object_count": len(commands),
-            "layout_notes": template_scene_plan.layout_notes,
-            "source": "template",
-        }
-
-        if not self._has_scene_patch_hint(text, template_scene_plan.title, template_scene_plan.scene_type):
-            return {
-                "commands": commands,
-                "response": template_scene_plan.response,
-                "reason": "scene_template",
-                "scene": scene_payload,
-            }
-
-        if not config:
-            scene_payload["patch_status"] = "skipped_no_llm_config"
-            return {
-                "commands": commands,
-                "response": template_scene_plan.response + " 额外描述需要配置 LLM 后才能继续细化。",
-                "reason": "scene_template_patch_skipped_no_llm_config",
-                "scene": scene_payload,
-            }
-
-        try:
-            patch_plan = await ScenePatchPlanner().plan(
-                text=text,
-                scene_type=template_scene_plan.scene_type,
-                title=template_scene_plan.title,
-                template_commands=commands,
-                llm_config=config,
-            )
-            patch_executor = ScenePatchExecutor(
-                scene_type=template_scene_plan.scene_type,
-                scene_title=template_scene_plan.title,
-                template_commands=commands,
-                canvas_context=canvas_context,
-            )
-            patch_commands = patch_executor.execute(patch_plan)
-        except ScenePatchPlanningError as e:
-            scene_payload["patch_status"] = "failed"
-            return {
-                "commands": commands,
-                "response": template_scene_plan.response + e.message,
-                "reason": e.reason,
-                "scene": scene_payload,
-            }
-        except Exception as e:
-            scene_payload["patch_status"] = "failed"
-            return {
-                "commands": commands,
-                "response": template_scene_plan.response + " 额外描述暂时没有应用成功。",
-                "reason": f"ScenePatch failed: {str(e)}",
-                "scene": scene_payload,
-            }
-
-        if not patch_commands:
-            scene_payload["patch_status"] = "empty"
-            return {
-                "commands": commands,
-                "response": template_scene_plan.response,
-                "reason": "scene_template_patch_empty",
-                "scene": scene_payload,
-            }
-
-        needs_disambiguation = bool(patch_executor.needs_disambiguation and patch_executor.disambiguation)
-        disambiguation = patch_executor.disambiguation if needs_disambiguation else None
-        if disambiguation:
-            disambiguation["commands"] = [
-                command
-                for command in patch_commands
-                if command.get("target") == "__pending_target__"
-            ]
-
-        scene_payload.update(
-            {
-                "object_count": len(commands) + len(patch_commands),
-                "patch_status": "applied",
-                "patch_count": len(patch_commands),
-            }
-        )
-        return {
-            "commands": [*commands, *patch_commands],
-            "response": patch_plan.response or f"好的，我在{template_scene_plan.title}模板上应用了额外描述。",
-            "reason": "scene_template_patch",
-            "scene": scene_payload,
-            "needs_disambiguation": needs_disambiguation,
-            "disambiguation": disambiguation,
-        }
 
     async def get_active_config(self, user_id: int) -> Optional[LLMConfig]:
         """获取用户的激活LLM配置"""
@@ -602,95 +423,22 @@ arguments: {"reason": "忽略原因"}
 
         decision = classify_llm_route(text, has_llm_config=True)
         if decision.route in {"template_scene", "template_scene_patch"}:
-            template_scene_plan = (
-                build_template_scene_plan_by_type(decision.matched_scene_type)
-                if decision.matched_scene_type
-                else None
-            )
-            if not template_scene_plan:
-                return {
-                    "intent": "clarify",
-                    "confidence": 0.0,
-                    "commands": [],
-                    "response": "我找到了场景模板线索，但没能生成稳定的本地场景。",
-                    "reason": "Template scene route did not include a valid scene type",
-                    "llm_route": decision.route,
-                    "llm_used": False,
-                    "routing_reason": decision.reason,
-                }
-
-            commands = SceneExecutor(canvas_context).execute(template_scene_plan)
             config = None
             if decision.route == "template_scene_patch":
                 if llm_config_id:
                     config = await self.get_config_by_id(llm_config_id)
                 else:
                     config = await self.get_active_config(user_id)
-            patched = await self._apply_scene_patch_if_needed(
+
+            return await self.scene_command_service.execute_template(
                 text=text,
-                template_scene_plan=template_scene_plan,
-                commands=commands,
+                decision=decision,
                 config=config,
                 canvas_context=canvas_context,
             )
-            return {
-                "intent": "draw",
-                "confidence": 1.0,
-                "commands": patched["commands"],
-                "response": patched["response"],
-                "reason": patched["reason"],
-                "scene": patched["scene"],
-                "llm_route": decision.route,
-                "llm_used": bool(config and decision.route == "template_scene_patch"),
-                "routing_reason": decision.reason,
-                "needs_disambiguation": bool(patched.get("needs_disambiguation")),
-                "disambiguation": patched.get("disambiguation"),
-            }
 
         if decision.route == "local_object":
-            object_match = self._object_match_from_decision(decision)
-            object_request = (
-                build_simple_object_request_from_match(
-                    text,
-                    object_match,
-                    self.asset_resolver,
-                )
-                if object_match
-                else None
-            )
-            if not object_request:
-                return {
-                    "intent": "clarify",
-                    "confidence": 0.0,
-                    "commands": [],
-                    "response": "我识别到了本地对象，但没能生成可靠的绘图参数。",
-                    "reason": "Local object route did not include a rebuildable object match",
-                    "llm_route": "local_object",
-                    "llm_used": False,
-                    "routing_reason": decision.reason,
-                }
-
-            executor = DrawingExecutor(canvas_context)
-            if object_request.source == "svg_asset" and object_request.asset:
-                commands = [executor._create_svg_asset(object_request.args, object_request.asset)]
-            else:
-                commands = executor._create_object(object_request.args)
-            return {
-                "intent": "draw",
-                "confidence": 1.0,
-                "commands": commands,
-                "response": f"好的，我添加了{object_request.label}。",
-                "reason": object_request.source,
-                "llm_route": "local_object",
-                "llm_used": False,
-                "routing_reason": decision.reason,
-                "local_object": {
-                    "source": object_request.source,
-                    "label": object_request.label,
-                    "asset_id": object_request.asset.asset_id if object_request.asset else None,
-                    "kind": object_request.args.kind,
-                },
-            }
+            return self.local_object_service.execute(text, decision, canvas_context)
 
         if llm_config_id:
             config = await self.get_config_by_id(llm_config_id)
@@ -702,7 +450,7 @@ arguments: {"reason": "忽略原因"}
                 "intent": "clarify",
                 "confidence": 0.0,
                 "commands": [],
-                "response": "这个需求需要第三层 LLM 增强理解，请先配置并启用模型。",
+                "response": "这个需求需要 LLM 增强理解，请先配置并启用模型。",
                 "reason": "No active LLM configuration found",
                 "llm_route": "requires_llm",
                 "llm_used": False,
@@ -715,7 +463,7 @@ arguments: {"reason": "忽略原因"}
                 canvas_context=canvas_context,
                 llm_config=config,
             )
-            return self._execute_svg_scene_response(svg_scene, decision.reason)
+            return self.open_svg_scene_service.execute_response(svg_scene, decision.reason)
 
         try:
             # 构建系统消息，包含SVG资源目录
@@ -741,7 +489,7 @@ arguments: {"reason": "忽略原因"}
                 result = self._extract_json(content or "")
                 if "calls" in result:
                     plan = parse_drawing_plan(result)
-                    executed = DrawingExecutor(canvas_context).execute(plan)
+                    executed = DrawingCommandCompiler(canvas_context).execute(plan)
                     normalized = self._normalize_llm_result(executed)
                     if not normalized.get("commands"):
                         return {
