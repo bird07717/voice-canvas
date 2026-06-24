@@ -9,6 +9,7 @@ class LLMConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
+    api_format = Column(String(30), default="openai", nullable=False)
     base_url = Column(String(500), nullable=False)
     api_key = Column(String(500), nullable=False)
     model_name = Column(String(100), default="gpt-3.5-turbo")

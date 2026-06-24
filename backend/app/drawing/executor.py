@@ -84,7 +84,7 @@ COLOR_ALIASES = {
 }
 
 
-class DrawingExecutor:
+class DrawingCommandCompiler:
     def __init__(self, canvas_context: Optional[Dict[str, Any]] = None):
         self._id_counter = count(1)
         self._id_prefix = f"obj_{uuid4().hex[:8]}"
@@ -170,8 +170,8 @@ class DrawingExecutor:
         if render_strategy == "template" or kind in TEMPLATE_KINDS:
             return [self._create_template(kind, args)]
 
-        # 优先级4: 创建占位符
-        return [self._create_svg_placeholder(args)]
+        # 未命中本地素材或模板时不要污染画布；路由层会将开放绘制请求交给 SVG 整图生成。
+        return []
 
     def _create_basic_shape(self, kind: str, args: CreateObjectArgs) -> Dict[str, Any]:
         x, y = self._resolve_position(args.position)
@@ -260,23 +260,6 @@ class DrawingExecutor:
             "id": self._next_id(),
             "params": {"kind": kind},
             "children": children
-        }
-
-    def _create_svg_placeholder(self, args: CreateObjectArgs) -> Dict[str, Any]:
-        x, y = self._resolve_position(args.position)
-        width, height = self._resolve_size(args.size)
-        text = args.kind or "custom"
-        return {
-            "action": "create",
-            "type": "text",
-            "id": self._next_id(),
-            "params": {
-                "x": x - width / 2,
-                "y": y - height / 2,
-                "text": f"{text}（SVG待生成）",
-                "fontSize": 20,
-                "fill": "#555555"
-            }
         }
 
     def _create_svg_asset(self, args: CreateObjectArgs, asset: SVGAsset) -> Dict[str, Any]:
@@ -831,3 +814,6 @@ class DrawingExecutor:
             {"id": self._next_id(), "type": "line", "params": {"points": [x - width * 0.28, y + height * 0.06, x - width * 0.34, y + height * 0.38], "stroke": stroke, "strokeWidth": 4}},
             {"id": self._next_id(), "type": "line", "params": {"points": [x + width * 0.28, y + height * 0.06, x + width * 0.34, y + height * 0.38], "stroke": stroke, "strokeWidth": 4}},
         ]
+
+
+DrawingExecutor = DrawingCommandCompiler

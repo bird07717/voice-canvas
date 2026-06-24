@@ -12,6 +12,7 @@ export interface CommandTargetQuery {
 export interface DrawCommand {
   action:
     | 'create'
+    | 'replaceScene'
     | 'modify'
     | 'move'
     | 'moveBy'
@@ -117,31 +118,51 @@ export type VoiceIntent =
   | 'clarify'
   | 'ignore'
 
+export type SceneRenderMode = 'object_scene' | 'svg_image'
+
+export interface SceneTemplateManifestItem {
+  scene_type: string
+  title: string
+  aliases: string[]
+  render_mode: SceneRenderMode
+}
+
+export interface SceneTemplateManifestResponse {
+  version: string
+  templates: SceneTemplateManifestItem[]
+}
+
 // 语音命令响应
 export interface VoiceCommandResponse {
   intent: VoiceIntent
   confidence: number
+  command_protocol?: 'draw-command-v1'
   commands: DrawCommand[]
   response: string
   reason?: string
-  llm_route?: 'template_scene' | 'template_scene_patch' | 'open_scene' | 'tool_plan' | 'requires_llm'
+  llm_route?: 'local_object' | 'template_scene' | 'template_scene_patch' | 'open_scene' | 'tool_plan' | 'requires_llm'
   llm_used?: boolean
   routing_reason?: string
   scene?: {
     scene_type: string
     title: string
     style: string
+    render_mode?: SceneRenderMode
     object_count: number
     layout_notes?: string | null
     source?: string
     patch_status?: string
     patch_count?: number
+    repaired?: boolean
+    fallback_reason?: string | null
   }
   svg_scene?: {
     scene_type: string
     title: string
     source: string
     svg?: string
+    repaired?: boolean
+    fallback_reason?: string | null
   }
   needs_disambiguation?: boolean
   disambiguation?: {

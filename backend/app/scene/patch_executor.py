@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from uuid import uuid4
 
 from app.assets.resolver import AssetResolver, SVGAsset
-from app.drawing.executor import DrawingExecutor
+from app.drawing.executor import DrawingCommandCompiler
 from app.drawing.schemas import CreateObjectArgs, PositionSpec, SizeSpec, StyleSpec
 from app.drawing.target_resolver import (
     PENDING_TARGET,
@@ -49,7 +49,7 @@ BASIC_KINDS = {
 }
 
 
-class ScenePatchExecutor:
+class ScenePatchCommandCompiler:
     def __init__(
         self,
         scene_type: str,
@@ -63,7 +63,7 @@ class ScenePatchExecutor:
         self.template_commands = template_commands
         self.canvas_context = canvas_context or {}
         self.asset_resolver = asset_resolver or AssetResolver()
-        self.drawing_executor = DrawingExecutor(canvas_context)
+        self.drawing_compiler = DrawingCommandCompiler(canvas_context)
         self._id_counter = count(1)
         self._id_prefix = f"patch_{uuid4().hex[:8]}"
         self.needs_disambiguation = False
@@ -117,7 +117,7 @@ class ScenePatchExecutor:
             ),
             description=operation.description or operation.label,
         )
-        created = self.drawing_executor._create_object(args)
+        created = self.drawing_compiler._create_object(args)
         for command in created:
             self._rewrite_command_ids(command)
         for command in created:
@@ -284,3 +284,6 @@ class ScenePatchExecutor:
         child["id"] = self._next_patch_id()
         for nested in child.get("children") or []:
             self._rewrite_child_ids(nested)
+
+
+ScenePatchExecutor = ScenePatchCommandCompiler

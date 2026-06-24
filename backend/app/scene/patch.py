@@ -1,11 +1,11 @@
 import json
 from typing import Any, Dict, List, Literal, Optional
 
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field, ValidationError
 
 from app.assets.resolver import AssetResolver
 from app.models.llm_config import LLMConfig
+from app.services.llm_client import complete_text
 
 
 PatchAction = Literal["add", "modify", "delete"]
@@ -156,13 +156,8 @@ class ScenePatchPlanner:
         asset_resolver: Optional[AssetResolver] = None,
     ) -> ScenePatchPlan:
         resolver = asset_resolver or AssetResolver()
-        client = AsyncOpenAI(
-            api_key=llm_config.api_key,
-            base_url=llm_config.base_url,
-        )
-
-        response = await client.chat.completions.create(
-            model=llm_config.model_name,
+        response = await complete_text(
+            llm_config,
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "system", "content": f"当前模板摘要：{self._format_template_summary(scene_type, title, template_commands)}"},
@@ -171,9 +166,10 @@ class ScenePatchPlanner:
             ],
             temperature=0.25,
             max_tokens=1600,
+            timeout=30.0,
         )
 
-        content = response.choices[0].message.content or ""
+        content = response.content
         try:
             raw = self._extract_json(content)
             plan = ScenePatchPlan.model_validate(raw)

@@ -64,6 +64,8 @@ export default function ChatPanel() {
 
   const getRouteLabel = (commandJson: any) => {
     switch (commandJson?.llm_route) {
+      case 'local_object':
+        return '本地素材/模板'
       case 'template_scene':
         return '固定模板'
       case 'template_scene_patch':

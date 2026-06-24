@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { message } from 'antd'
-import { VoiceCommandRequest, VoiceCommandResponse } from '@/types'
+import { SceneTemplateManifestResponse, VoiceCommandRequest, VoiceCommandResponse } from '@/types'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -124,6 +124,11 @@ class ApiService {
     return response.data
   }
 
+  async getSceneManifest(): Promise<SceneTemplateManifestResponse> {
+    const response = await this.client.get('/api/voice/scene-manifest')
+    return response.data
+  }
+
   async getChatHistory(canvasId: number) {
     const response = await this.client.get(`/api/voice/chat/${canvasId}/history`)
     return response.data
@@ -160,6 +165,7 @@ class ApiService {
 
   async createLLMConfig(data: {
     name: string
+    api_format: string
     base_url: string
     api_key: string
     model_name: string
@@ -172,6 +178,7 @@ class ApiService {
     id: number,
     data: Partial<{
       name: string
+      api_format: string
       base_url: string
       api_key: string
       model_name: string
@@ -192,6 +199,7 @@ class ApiService {
   }
 
   async testLLMConnection(data: {
+    api_format: string
     base_url: string
     api_key: string
     model_name: string

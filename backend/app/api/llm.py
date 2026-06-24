@@ -61,6 +61,7 @@ async def create_llm_config(
     config = LLMConfig(
         user_id=current_user.id,
         name=config_data.name,
+        api_format=config_data.api_format,
         base_url=config_data.base_url,
         api_key=config_data.api_key,
         model_name=config_data.model_name,
@@ -172,6 +173,7 @@ async def test_llm_connection(
     try:
         llm_service = LLMService(None)
         success, message = await llm_service.test_connection(
+            api_format=test_data.api_format,
             base_url=test_data.base_url,
             api_key=test_data.api_key,
             model_name=test_data.model_name

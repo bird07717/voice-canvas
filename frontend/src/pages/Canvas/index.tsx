@@ -195,7 +195,7 @@ export default function Canvas() {
             placeholder="选择模型"
             style={{ minWidth: 200 }}
             options={configs.map((c) => ({
-              label: `${c.name} (${c.model_name})`,
+              label: `${c.name} (${c.api_format === 'anthropic' ? 'Anthropic' : 'OpenAI'} / ${c.model_name})`,
               value: c.id,
             }))}
           />

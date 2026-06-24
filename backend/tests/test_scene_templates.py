@@ -1,16 +1,24 @@
 import unittest
 
-from app.scene.executor import SceneExecutor
-from app.scene.templates import build_template_scene_plan
+from app.scene.executor import SceneCommandCompiler
+from app.scene.templates import build_template_scene_plan, get_scene_manifest
 
 
 def execute_template(text: str):
     plan = build_template_scene_plan(text)
     assert plan is not None
-    return SceneExecutor({"objects": [], "recentCommands": []}).execute(plan)
+    return SceneCommandCompiler({"objects": [], "recentCommands": []}).execute(plan)
 
 
 class SceneTemplateTest(unittest.TestCase):
+    def test_scene_manifest_exports_template_aliases(self):
+        manifest = get_scene_manifest()
+        park = next(item for item in manifest if item["scene_type"] == "park")
+
+        self.assertEqual(park["title"], "公园")
+        self.assertEqual(park["render_mode"], "object_scene")
+        self.assertIn("公园", park["aliases"])
+
     def test_birthday_card_excludes_broken_gift_asset(self):
         commands = execute_template("画一个生日贺卡")
         kinds = [(command.get("params") or {}).get("kind") for command in commands]

@@ -1,4 +1,4 @@
-import { CanvasCommandContext, DrawCommand } from '@/types'
+import { CanvasCommandContext, DrawCommand, SceneTemplateManifestItem } from '@/types'
 import { ResolveAction, ResolveResult, hasSemanticTargetHint, resolveContextTarget, resolveObjectTarget } from './objectResolver'
 
 export const PENDING_TARGET = '__pending_target__'
@@ -27,24 +27,39 @@ const COLOR_MAP: Array<[RegExp, string, string]> = [
   [/橙色?|橙的/, '#f97316', '橙色'],
 ]
 
-const SCENE_REQUEST_PATTERNS = [
-  /海边日落|海边|日落/,
-  /公园/,
-  /生日贺卡|贺卡/,
-  /城市夜景|夜晚城市|城市/,
-  /森林小屋|森林/,
-  /山水风景|山水/,
-  /教室|课堂/,
-  /温馨客厅|客厅/,
-  /桌面工作区|工作区|书桌|办公桌|学习桌/,
-  /节日派对|派对|节日装饰|生日派对|庆祝场景/,
+const SCENE_DRAW_PREFIXES = [
+  '画一个',
+  '画一幅',
+  '画一张',
+  '画个',
+  '画',
+  '生成一个',
+  '生成一幅',
+  '生成一张',
+  '生成',
+  '创建一个',
+  '创建一幅',
+  '创建一张',
+  '创建',
+  '来一个',
+  '来一幅',
+  '来一张',
+  '来个',
+  '做一个',
+  '做一幅',
+  '做一张',
+  '做个',
 ]
 
-const OPEN_SCENE_REQUEST_PATTERNS = [
-  ...SCENE_REQUEST_PATTERNS,
+const SCENE_BARE_SUFFIXES = ['', '场景', '模板', '图', '画', '画面', '的场景', '的模板', '的图', '的画面']
+
+const SCENE_PATCH_HINT_PATTERN =
+  /(加|添加|放|摆|带|有|不要|去掉|删除|移除|改|换|变|变成|旁边|左边|右边|上面|下面|背景|前景|文字|写)/
+
+const GENERIC_SCENE_REQUEST_PATTERNS = [
   /场景|一幅|一张/,
   /画面|插画|风景|海报|卡片|房间/,
-  /书房|卧室|厨房|办公室|工作室|实验室|咖啡馆|餐厅|商店|室内/,
+  /卧室|厨房|办公室|工作室|实验室|咖啡馆|餐厅|商店|室内/,
   /赛博朋克|蒸汽朋克|未来感|科幻/,
 ]
 
@@ -57,22 +72,68 @@ const normalizeSceneRequestText = (rawText: string) =>
 const hasSceneRequestPrefix = (text: string) =>
   /^(画|画一个|画个|生成|创建|来一个|来个|做一个|做个)/.test(text)
 
+const stripSceneRequestPrefix = (text: string) => {
+  for (const prefix of SCENE_DRAW_PREFIXES) {
+    if (text.startsWith(prefix)) return text.slice(prefix.length)
+  }
+  return text
+}
+
 const isBlockedSceneCommand = (text: string) => {
   if (/^(选中|选择|删除|删掉|去掉|撤销|重做|保存|导出|清空)/.test(text)) return true
   if (/^(把|将|让|改|换|变|移动|移到|移去|挪到|放到|放在|去掉|移除)/.test(text)) return true
   return /(变大|变小|放大|缩小|左移|右移|上移|下移|往左|往右|往上|往下)/.test(text)
 }
 
-export const isTemplateSceneRequest = (rawText: string) => {
+const hasTemplateSceneAlias = (text: string, sceneManifest: SceneTemplateManifestItem[] = []) =>
+  sceneManifest.some((scene) =>
+    scene.aliases.some((alias) => alias && text.includes(alias.replace(/\s/g, '')))
+  )
+
+export const isTemplateSceneRequest = (
+  rawText: string,
+  sceneManifest: SceneTemplateManifestItem[] = []
+) => {
   const text = normalizeSceneRequestText(rawText)
   if (!text || isBlockedSceneCommand(text)) return false
-  return hasSceneRequestPrefix(text) && SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+  return hasSceneRequestPrefix(text) && hasTemplateSceneAlias(text, sceneManifest)
 }
 
-export const isLikelySceneRequest = (rawText: string) => {
+export const matchTemplateSceneShortcut = (
+  rawText: string,
+  sceneManifest: SceneTemplateManifestItem[] = []
+) => {
+  const text = normalizeSceneRequestText(rawText)
+  if (!text || isBlockedSceneCommand(text) || !hasSceneRequestPrefix(text)) return null
+  if (SCENE_PATCH_HINT_PATTERN.test(text)) return null
+
+  const sceneText = stripSceneRequestPrefix(text)
+  for (const scene of sceneManifest) {
+    for (const alias of scene.aliases) {
+      const normalizedAlias = alias.replace(/\s/g, '')
+      if (SCENE_BARE_SUFFIXES.some((suffix) => sceneText === `${normalizedAlias}${suffix}`)) {
+        return {
+          title: scene.title,
+          canonicalText: `画一个${scene.title}`,
+          normalizedText: text,
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+export const isLikelySceneRequest = (
+  rawText: string,
+  sceneManifest: SceneTemplateManifestItem[] = []
+) => {
   const text = normalizeSceneRequestText(rawText)
   if (!text || isBlockedSceneCommand(text)) return false
-  return hasSceneRequestPrefix(text) && OPEN_SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+  return hasSceneRequestPrefix(text) && (
+    hasTemplateSceneAlias(text, sceneManifest) ||
+    GENERIC_SCENE_REQUEST_PATTERNS.some((pattern) => pattern.test(text))
+  )
 }
 
 const normalizeText = (text: string) => {
@@ -210,9 +271,10 @@ const controlResult = (
 
 export function matchFastCommand(
   rawText: string,
-  context: CanvasCommandContext
+  context: CanvasCommandContext,
+  options: { sceneManifest?: SceneTemplateManifestItem[] } = {}
 ): FastCommandResult {
-  if (isLikelySceneRequest(rawText)) {
+  if (isLikelySceneRequest(rawText, options.sceneManifest || [])) {
     return {
       matched: false,
       message: '场景命令交给 Scene Planner 处理。',

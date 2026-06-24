@@ -3,6 +3,7 @@ import { create } from 'zustand'
 export interface LLMConfig {
   id: number
   name: string
+  api_format: 'openai' | 'anthropic'
   base_url: string
   api_key: string
   model_name: string

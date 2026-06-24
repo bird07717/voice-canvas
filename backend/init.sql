@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
+    api_format VARCHAR(30) DEFAULT 'openai' NOT NULL,
     base_url VARCHAR(500) NOT NULL,
     api_key VARCHAR(500) NOT NULL,
     model_name VARCHAR(100) DEFAULT 'gpt-3.5-turbo',
@@ -48,6 +49,9 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)
 );
+
+ALTER TABLE llm_configs
+ADD COLUMN IF NOT EXISTS api_format VARCHAR(30) DEFAULT 'openai' NOT NULL;
 
 -- 创建更新时间触发器
 CREATE OR REPLACE FUNCTION update_updated_at_column()

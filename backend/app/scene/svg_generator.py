@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -8,15 +9,18 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from openai import AsyncOpenAI
-
 from app.models.llm_config import LLMConfig
+from app.services.llm_client import complete_text
 
 
 logger = logging.getLogger(__name__)
 
 SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
+SVG_GENERATION_TIMEOUT_SECONDS = 90.0  # 增加到90秒
+SVG_REPAIR_TIMEOUT_SECONDS = 45.0  # 增加到45秒
+SVG_MAX_TOKENS = 4200
+SVG_REPAIR_MAX_TOKENS = 4200
 
 
 @dataclass(frozen=True)
@@ -28,15 +32,23 @@ class SvgSceneResult:
     style: str = "svg"
     source: str = "llm_svg_scene"
     layout_notes: Optional[str] = None
+    repaired: bool = False
+    fallback_reason: Optional[str] = None
 
 
 class SvgSceneGeneratorError(Exception):
     pass
 
 
+class SvgSceneValidationError(SvgSceneGeneratorError):
+    def __init__(self, message: str, raw_content: str = "") -> None:
+        super().__init__(message)
+        self.raw_content = raw_content
+
+
 class SvgSceneGenerator:
-    SYSTEM_PROMPT = """你是语音绘画系统的第三层 SVG 画面生成器。
-前两层已经处理了快速几何命令和固定场景模板。
+    SYSTEM_PROMPT = """你是语音绘画系统的开放式 SVG 整图生成器。
+前端快速命令、后端本地对象和固定场景模板已经处理了确定性请求。
 你只负责把用户的开放式绘画需求，直接写成一整张可渲染的 SVG 画面。
 
 只输出一个完整的 <svg>...</svg>，不要 JSON，不要 Markdown，不要解释。
@@ -49,10 +61,11 @@ class SvgSceneGenerator:
 
 要求：
 - 画面要完整，有背景、主体、前景和必要装饰。
-- SVG 控制在 80 个图形元素以内，优先使用简洁几何组合，必须完整闭合。
+- SVG 控制在 70 个图形元素以内，优先使用简洁几何组合，必须完整闭合。
+- 优先生成稳定、可解析的 SVG，同时保留足够画面细节。
 - 如果用户要求赛博朋克、图书馆、咖啡馆、房间、教室、生日贺卡、海边、森林等，直接围绕该主题创作。
 - 文字要直接写进 SVG 里。
-- 场景要像一整张作品，而不是对象清单。
+- 场景要像一整张作品，而不是对象清单；生成结果会作为一个整体 image 放入画布，不提供对象级拆分编辑。
 """
 
     def __init__(self) -> None:
@@ -63,45 +76,128 @@ class SvgSceneGenerator:
         text: str,
         canvas_context: Optional[Dict[str, Any]],
         llm_config: LLMConfig,
+        timeout_seconds: float = SVG_GENERATION_TIMEOUT_SECONDS,
     ) -> SvgSceneResult:
         try:
-            svg = await self._generate_svg(text, canvas_context, llm_config)
+            svg = await asyncio.wait_for(
+                self._generate_svg(text, canvas_context, llm_config, timeout_seconds),
+                timeout=timeout_seconds + 5.0,
+            )
             return self._build_result(text, svg, source="llm_svg_scene")
-        except Exception as exc:
-            logger.warning("SVG scene generation failed, using fallback: %s", exc)
+        except SvgSceneValidationError as exc:
+            repaired = await self._repair_after_validation_error(
+                text=text,
+                canvas_context=canvas_context,
+                llm_config=llm_config,
+                validation_error=exc,
+            )
+            if repaired:
+                return self._build_result(
+                    text,
+                    repaired,
+                    source="llm_svg_scene_repaired",
+                    reason=f"首轮 SVG 校验失败，已自动修复：{str(exc)}",
+                    repaired=True,
+                )
+            logger.warning("SVG scene generation validation failed, using fallback: %s", exc)
             return self.fallback(text, str(exc))
+        except Exception as exc:
+            error_msg = f"{type(exc).__name__}: {str(exc)}"
+            logger.warning("SVG scene generation failed, using fallback: %s", error_msg)
+            return self.fallback(text, error_msg)
 
     async def _generate_svg(
         self,
         text: str,
         canvas_context: Optional[Dict[str, Any]],
         llm_config: LLMConfig,
+        timeout_seconds: float,
     ) -> str:
-        client = AsyncOpenAI(
-            api_key=llm_config.api_key,
-            base_url=llm_config.base_url,
-            timeout=120.0,
-        )
-
-        response = await client.chat.completions.create(
-            model=llm_config.model_name,
+        response = await complete_text(
+            llm_config,
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "system", "content": self._format_canvas_context(canvas_context)},
                 {"role": "user", "content": self._format_user_prompt(text)},
             ],
             temperature=0.35,
-            max_tokens=5000,
-            timeout=120.0,
+            max_tokens=SVG_MAX_TOKENS,
+            timeout=timeout_seconds,
         )
 
-        choice = response.choices[0]
-        content = self._extract_response_text(choice.message)
+        return self._extract_and_sanitize_response(
+            response.content,
+            finish_reason=response.finish_reason,
+        )
+
+    async def _repair_after_validation_error(
+        self,
+        text: str,
+        canvas_context: Optional[Dict[str, Any]],
+        llm_config: LLMConfig,
+        validation_error: SvgSceneValidationError,
+    ) -> Optional[str]:
+        raw_content = validation_error.raw_content.strip()
+        if not raw_content:
+            return None
+
+        try:
+            return await asyncio.wait_for(
+                self._repair_svg(
+                    text=text,
+                    canvas_context=canvas_context,
+                    llm_config=llm_config,
+                    raw_content=raw_content,
+                    error_message=str(validation_error),
+                ),
+                timeout=SVG_REPAIR_TIMEOUT_SECONDS + 5.0,
+            )
+        except Exception as exc:
+            logger.warning("SVG scene repair failed: %s", exc)
+            return None
+
+    async def _repair_svg(
+        self,
+        text: str,
+        canvas_context: Optional[Dict[str, Any]],
+        llm_config: LLMConfig,
+        raw_content: str,
+        error_message: str,
+    ) -> str:
+        response = await complete_text(
+            llm_config,
+            messages=[
+                {"role": "system", "content": self._repair_system_prompt()},
+                {"role": "system", "content": self._format_canvas_context(canvas_context)},
+                {
+                    "role": "user",
+                    "content": self._format_repair_prompt(
+                        text=text,
+                        raw_content=raw_content,
+                        error_message=error_message,
+                    ),
+                },
+            ],
+            temperature=0.15,
+            max_tokens=SVG_REPAIR_MAX_TOKENS,
+            timeout=SVG_REPAIR_TIMEOUT_SECONDS,
+        )
+
+        return self._extract_and_sanitize_response(
+            response.content,
+            finish_reason=response.finish_reason,
+        )
+
+    def _extract_and_sanitize_response(
+        self,
+        content: str,
+        finish_reason: Optional[str] = None,
+    ) -> str:
         try:
             return self._sanitize_svg(self._extract_svg(content))
         except SvgSceneGeneratorError as exc:
-            finish_reason = getattr(choice, "finish_reason", None)
-            raise SvgSceneGeneratorError(f"{exc}; finish_reason={finish_reason}") from exc
+            reason = f"{exc}; finish_reason={finish_reason}"
+            raise SvgSceneValidationError(reason, raw_content=content) from exc
 
     def _extract_response_text(self, message: Any) -> str:
         content = str(getattr(message, "content", "") or "").strip()
@@ -127,6 +223,7 @@ class SvgSceneGenerator:
             reason=reason,
             scene_type=scene_type,
             title=title,
+            fallback_reason=reason,
         )
 
     def _build_result(
@@ -137,6 +234,8 @@ class SvgSceneGenerator:
         reason: str = "",
         scene_type: Optional[str] = None,
         title: Optional[str] = None,
+        repaired: bool = False,
+        fallback_reason: Optional[str] = None,
     ) -> SvgSceneResult:
         resolved_title = title or self._title_from_text(text)
         resolved_scene_type = scene_type or self._scene_type_from_text(text)
@@ -153,6 +252,8 @@ class SvgSceneGenerator:
             style="svg",
             source=source,
             layout_notes=layout_notes,
+            repaired=repaired,
+            fallback_reason=fallback_reason,
         )
 
     def _extract_svg(self, content: str) -> str:
@@ -386,9 +487,35 @@ class SvgSceneGenerator:
         return "\n".join([
             f"用户绘画需求：{text}",
             "请现在直接输出 SVG。",
-            "SVG 要简洁、完整、可解析，不要超过 80 个图形元素。",
+            "SVG 要完整、可解析，不要超过 70 个图形元素。",
+            "尽量控制在 4200 tokens 以内。",
             "不要写“好的”、不要解释、不要代码围栏。",
             "输出必须从 <svg 开始，以 </svg> 结束。",
+        ])
+
+    def _repair_system_prompt(self) -> str:
+        return """你是 SVG 修复器。
+你只负责把一段失败的模型输出修复成一个可解析、可渲染、安全的 SVG。
+只输出完整 <svg>...</svg>，不要 Markdown，不要解释。
+画布固定为 800x600，viewBox 必须是 "0 0 800 600"。
+不要使用 script、foreignObject、iframe、image、video、audio、link、style 标签。
+不要引用外部资源，不要写事件属性。
+允许 rect、circle、ellipse、line、polygon、polyline、path、text、defs、linearGradient、radialGradient、clipPath、mask、stop。
+尽量保留原始画面意图、主体、文字和配色，但必须修复 XML 闭合、非法标签、非法属性、截断和多余解释文本。
+"""
+
+    def _format_repair_prompt(
+        self,
+        text: str,
+        raw_content: str,
+        error_message: str,
+    ) -> str:
+        clipped = raw_content[:12000]
+        return "\n".join([
+            f"用户原始绘画需求：{text}",
+            f"校验错误：{error_message}",
+            "请修复下面的输出，使它成为唯一的完整 SVG：",
+            clipped,
         ])
 
     def _format_canvas_context(self, canvas_context: Optional[Dict[str, Any]]) -> str:

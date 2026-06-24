@@ -234,6 +234,23 @@ def get_scene_template(scene_type: str) -> Optional[Dict[str, Any]]:
     return deepcopy(template) if template else None
 
 
+def get_scene_title(scene_type: str) -> str:
+    normalized = normalize_scene_type(scene_type)
+    return SCENE_TITLES.get(normalized, normalized)
+
+
+def get_scene_manifest() -> List[Dict[str, Any]]:
+    return [
+        {
+            "scene_type": scene_type,
+            "title": get_scene_title(scene_type),
+            "aliases": list(aliases),
+            "render_mode": "object_scene",
+        }
+        for scene_type, aliases in SCENE_TEXT_ALIASES
+    ]
+
+
 def match_template_scene_type(text: str) -> Optional[str]:
     normalized = "".join(str(text or "").split())
     if not normalized:
@@ -245,20 +262,27 @@ def match_template_scene_type(text: str) -> Optional[str]:
     return None
 
 
-def build_template_scene_plan(text: str) -> Optional[ScenePlan]:
-    scene_type = match_template_scene_type(text)
-    if not scene_type:
+def build_template_scene_plan_by_type(scene_type: str) -> Optional[ScenePlan]:
+    normalized_type = normalize_scene_type(scene_type)
+    if not get_scene_template(normalized_type):
         return None
 
-    title = SCENE_TITLES.get(scene_type, scene_type)
+    title = get_scene_title(normalized_type)
     plan = ScenePlan(
-        scene_type=scene_type,
+        scene_type=normalized_type,
         title=title,
         style="cartoon_flat",
         objects=[],
         response=f"好的，我用模板快速生成了{title}场景。",
     )
     return apply_scene_template(plan)
+
+
+def build_template_scene_plan(text: str) -> Optional[ScenePlan]:
+    scene_type = match_template_scene_type(text)
+    if not scene_type:
+        return None
+    return build_template_scene_plan_by_type(scene_type)
 
 
 def apply_scene_template(plan: ScenePlan) -> ScenePlan:
